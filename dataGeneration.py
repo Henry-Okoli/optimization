@@ -4,8 +4,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from geopy.distance import geodesic
 
-
-folder =  'Output/WarehouseI'
+folder =  'output/WarehouseI'
 
 # Load the data
 df = pd.read_csv(folder + '.csv')
@@ -68,45 +67,58 @@ for _, row in distances_df.iterrows():
 pos = {}
 layers = {'M': 0, 'W': 1, 'D': 2, 'R': 3}
 clusters = df['ClusterCode'].unique()
-node_counts = {cluster: {layer: 0 for layer in layers.values()} for cluster in clusters}
-node_counts['Core'] = {0: 0}  # For core nodes
-
-for node in G.nodes():
-    layer = layers[node[0]]
-    cluster = df[df['code'] == node]['ClusterCode'].iloc[0] if node[0] != 'M' else 'Core'
-    
-    if cluster == 'Core':
-        x = 0
-        node_counts['Core'][0] += 1
-        y = node_counts['Core'][0]
-    elif cluster == clusters[0]:  # cluster1
-        x = 2 + layer  # Right side
-        node_counts[cluster][layer] += 1
-        y = node_counts[cluster][layer]
-    else:  # cluster2
-        x = -2 - layer  # Left side
-        node_counts[cluster][layer] += 1
-        y = node_counts[cluster][layer]
-    
-    pos[node] = (x, y)
-
-# Adjust y-positions to center nodes vertically
-max_counts = {cluster: max(counts.values()) for cluster, counts in node_counts.items()}
-for node in G.nodes():
-    x, y = pos[node]
-    cluster = df[df['code'] == node]['ClusterCode'].iloc[0] if node[0] != 'M' else 'Core'
-    y_adjusted = (y - (max_counts[cluster] + 1) / 2) / max_counts[cluster]
-    pos[node] = (x, y_adjusted)
 
 # Set node colors and sizes
 color_map = {'M': 'red', 'W': 'green', 'D': 'blue', 'R': 'yellow'}
-node_colors = [color_map[node[0]] for node in G.nodes()]
+node_colors = []
+node_sizes = []
 
-size_map = {'M': 1000, 'W': 800, 'D': 600, 'R': 400}
-node_sizes = [size_map[node[0]] for node in G.nodes()]
+# Place the core nodes (M)
+core_nodes = sorted([node for node in G.nodes if node.startswith('M')])
+core_x = 0
+core_y_spacing = 10
+for i, node in enumerate(core_nodes):
+    pos[node] = (core_x, i * core_y_spacing)
+    node_colors.append(color_map[node[0]])
+    node_sizes.append(1000)
+
+# Center the core nodes vertically
+core_y_offset = 3 # (10 - len(core_nodes) * core_y_spacing) / 2
+for i, node in enumerate(core_nodes):
+    pos[node] = (core_x, i * core_y_spacing + core_y_offset)
+
+# Place the warehouses (W) on the left or right based on their cluster, stacking vertically
+for cluster in clusters:
+    cluster_warehouses = sorted([node for node in G.nodes if node.startswith('W') and df[df['code'] == node]['ClusterCode'].iloc[0] == cluster])
+    warehouse_x = 2 if cluster == clusters[0] else -2
+    warehouse_y_spacing = 10 / len(cluster_warehouses) if len(cluster_warehouses) > 1 else 1
+    for i, node in enumerate(cluster_warehouses):
+        pos[node] = (warehouse_x, i * warehouse_y_spacing + 1.15)
+        node_colors.append(color_map[node[0]])
+        node_sizes.append(1000)
+
+# Place the distribution centers (D), taking advantage of vertical space
+for cluster in clusters:
+    cluster_dcs = sorted([node for node in G.nodes if node.startswith('D') and df[df['code'] == node]['ClusterCode'].iloc[0] == cluster])
+    dc_x = 3 if cluster == clusters[0] else -3
+    dc_y_spacing = 10 / len(cluster_dcs) if len(cluster_dcs) > 1 else 1
+    for i, node in enumerate(cluster_dcs):
+        pos[node] = (dc_x, i * dc_y_spacing)
+        node_colors.append(color_map[node[0]])
+        node_sizes.append(1000)
+
+# Place the retail outlets (R), taking advantage of vertical space
+for cluster in clusters:
+    cluster_ros = sorted([node for node in G.nodes if node.startswith('R') and df[df['code'] == node]['ClusterCode'].iloc[0] == cluster])
+    ro_x = 4 if cluster == clusters[0] else -4
+    ro_y_spacing = 10 / len(cluster_ros) if len(cluster_ros) > 1 else 1
+    for i, node in enumerate(cluster_ros):
+        pos[node] = (ro_x, i * ro_y_spacing)
+        node_colors.append(color_map[node[0]])
+        node_sizes.append(1000)
 
 # Plot the graph
-plt.figure(figsize=(20, 15))
+plt.figure(figsize=(12, 9))
 nx.draw(G, pos, node_color=node_colors, node_size=node_sizes, with_labels=True, font_size=8, font_weight='bold')
 
 # Add edge labels with 3 decimal places
@@ -115,7 +127,7 @@ nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=6)
 
 plt.title("Logistics Route Topology")
 plt.axis('off')
-plt.tight_layout()
+# plt.tight_layout()
 
 # Save the plot as a PNG file
 plt.savefig(folder + '/logistics_topology.png', dpi=300, bbox_inches='tight')

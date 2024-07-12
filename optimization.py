@@ -124,11 +124,8 @@ def aco(start_location, end_locations, vehicles, distance_matrix, pheromone_matr
     for _ in range(iterations):
         # Log Each Iteration Info
         print(f'    Interation {_}')
-        iteration_best_route = None
         iteration_best_cost = float('inf')
-        iteration_end_locations = None
-        iteration_distance_matrix = None
-        iteration_current_vehicle =None
+        ant_iteration = []
 
         # Create ant colony
         ants = [Ant(start_location, end_locations, vehicles, distance_matrix, pheromone_matrix, alpha, beta, location_index_mapping) for _ in range(num_ants)]
@@ -144,6 +141,7 @@ def aco(start_location, end_locations, vehicles, distance_matrix, pheromone_matr
         # Find the best route
         for ant in ants:
           #  print(f'Simulation {_} : Cost {ant.total_cost} ')
+            ant_iteration.append([ant.total_cost,ant.total_distance,ant.total_fuel_consumed,ant.route])
             if ant.total_cost < best_cost:
                 best_cost = ant.total_cost
                 best_route = ant.route
@@ -151,17 +149,11 @@ def aco(start_location, end_locations, vehicles, distance_matrix, pheromone_matr
                 current_vehicle = ant.current_vehicle
                 total_fuel_consumed = ant.total_fuel_consumed
 
-            # Best in Iteration
-            if ant.total_cost < iteration_best_cost:
-                iteration_best_cost = ant.total_cost
-                iteration_best_route = ant.route
-                iteration_end_locations = ant.end_locations
-                iteration_distance_matrix = ant.distance_matrix
-                iteration_current_vehicle = ant.current_vehicle
 
 
+        iteration_pd = pd.DataFrame(ant_iteration, columns=['total_cost','total_distance','total_fuel_consumed','route'])
         
-        
+        iteration_pd.to_csv(os.path.join(simulation_folder, f'ants_iteration{_}.csv'), index=False)
     
     # simulation.to_csv(os.path.join(simulation_folder, f'simulation_{_}.csv'), index=False)
     return total_fuel_consumed, current_vehicle ,best_distance, best_route, best_cost
@@ -261,16 +253,17 @@ def run_simulations(start_location, end_locations, vehicles, distance_matrix, lo
     for _ in range(num_simulations):
         # Initialize pheromone matrix
         print(f'Simulation {_}')
+        output_folder =  os.path.join(simulation_folder, f'simulation_{_}')
+        os.makedirs(output_folder, exist_ok=True)
         pheromone_matrix = np.ones((len(locations_df), len(locations_df)))  # Set initial pheromone levels to 1
         
-        total_fuel_consumed, current_vehicle,best_distance, best_route, best_cost = aco(start_location, end_locations, vehicles, distance_matrix, pheromone_matrix,simulation_folder=simulation_folder, cluster= cluster, evaporation_rate=PHEROMONE_EVAPORATION_RATE, deposit_rate=PHEROMONE_DEPOSIT_RATE, num_ants=NUM_ANTS, iterations=NUM_ITERATIONS)
+        total_fuel_consumed, current_vehicle,best_distance, best_route, best_cost = aco(start_location, end_locations, vehicles, distance_matrix, pheromone_matrix,simulation_folder=output_folder, cluster= cluster, evaporation_rate=PHEROMONE_EVAPORATION_RATE, deposit_rate=PHEROMONE_DEPOSIT_RATE, num_ants=NUM_ANTS, iterations=NUM_ITERATIONS)
         best_routes["ACO"].append(best_route)
         best_costs["ACO"].append(best_cost)
         # Save Data for the Simulation
-        
+
         best_details.append( [f'Simulation_{_}' , best_distance, best_cost , total_fuel_consumed ,best_route ] )
-        output_folder =  os.path.join(simulation_folder, f'simulation_{_}')
-        os.makedirs(output_folder, exist_ok=True)     
+     
         visualize_route(best_route, current_vehicle, distance_matrix, output_folder, cluster)
         save_route_data(best_route, current_vehicle, distance_matrix, output_folder, cluster, location_index_mapping, cycle_num=1)
 
