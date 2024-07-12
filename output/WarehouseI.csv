@@ -1,0 +1,49 @@
+ClusterCode,code,name,address,latitude,longitude,Capacity_KG
+Cluster1,R8,Chicken Republic - Distribution,"Mayor Bolaji Ariyor St, Lakki, Lagos",6.4277,3.5013,400
+Cluster1,R1,Chicken Republic - Ilupeju,"12 Coker Road, Ilupeju, Lagos",6.5556,3.3546,600
+Cluster1,R10,Chicken Republic - Oke Afa,"Plot 7, Egbe Road, Oke Afa Isolo, Lagos",6.5358,3.3027,900
+Cluster1,R11,Chicken Republic - Itire Ishaga Junction,"Oando Filling Station, Itire Ishaga Junction, Lagos",6.5163,3.3656,450
+Cluster1,R12,Chicken Republic - Okota,"8 Okota Road, Isolo, Lagos",6.5218,3.3121,650
+Cluster1,R13,Chicken Republic - Omole Residential Scheme,"Plot 86, Block 1V, Omole Residential Scheme, Ojodu, Lagos",6.6163,3.3588,500
+Cluster1,R14,Chicken Republic - Bode Thomas,"73 Bode Thomas Street, Surulere, Lagos",6.4973,3.3575,700
+Cluster1,R17,"Chicken Republic - Aguda, Surulere","No. 2 Kusimo Street, NEPA Junction, Aguda, Surulere, Lagos",6.4981,3.3566,410
+Cluster1,R2,Chicken Republic - Surulere,"73 Bode Thomas Street, Surulere, Lagos",6.4964,3.3533,600
+Cluster1,R20,Chicken Republic - Abule Egba,"Km 26, Old Lagos-Abeokuta Express Way, Abule Egba, Lagos",6.6331,3.3306,750
+Cluster1,R23,Chicken Republic - Idimu,"Idimu Road, Lagos",6.5741,3.2829,620
+Cluster1,R24,Chicken Republic - Ikorodu,"Ikorodu Road, Lagos",6.6194,3.5082,500
+Cluster1,R25,Chicken Republic - Ikeja City Mall,"Obafemi Awolowo Way, Alausa, Ikeja, Lagos",6.6218,3.3662,510
+Cluster1,R26,Chicken Republic - Yaba,"11, Commercial Avenue, Sabo, Yaba, Lagos",6.5126,3.3786,460
+Cluster1,R28,Chicken Republic - Ojota,"124, Ogudu Ojota Road, Ojota, Lagos",6.5828,3.3836,630
+Cluster1,R3,Chicken Republic - Ire Akari,"32 Ire Akari Estate Road, Oshodi-Isolo, Lagos",6.5275,3.3149,780
+Cluster1,R5,Chicken Republic - Ogudu,"124 Ogudu Ojota Road, Ojota, Lagos",6.5244,3.3792,560
+Cluster1,R6,Chicken Republic - Opebi,"37A Opebi Road, Ikeja, Lagos",6.5936,3.3504,612
+Cluster1,R7,Chicken Republic - Maryland,"Oando Filling Station, Maryland, Lagos",6.5653,3.3612,548
+Cluster1,R70,Chicken Republic - Festac Town Warehouse,"Festac Town, Lagos",6.47,3.2626,650
+Cluster2,R18,Chicken Republic - Agungi,"No 23 Ajiran Road, Agungi, Lekki, Lagos",6.4425,3.5094,750
+Cluster2,R27,Chicken Republic - Lekki Phase 1,"Admiralty Way, Lekki Phase 1, Lagos",6.4361,3.4443,535
+Cluster2,R30,Chicken Republic - Victoria Island,"83, Ahmadu Bello Way, Victoria Island, Lagos",6.4244,3.4173,845
+Cluster2,R31,Chicken Republic - Ikota,"Ikota Shopping Complex, VGC, Lekki",6.4413,3.5255,730
+Cluster2,R32,Chicken Republic - Lekki Phase 2,"Lekki-Epe Expressway, Lekki Phase 2",6.4228,3.4823,600
+Cluster2,R33,Chicken Republic - Ajah,"Ajah Bus Stop, Lekki",6.4683,3.5887,530
+Cluster2,R34,Chicken Republic - Anthony,"Ikorodu Road, Anthony",6.5604,3.3733,710
+Cluster2,R35,Chicken Republic - Obalende,"Obalende Bus Stop, Ikoyi",6.4414,3.4056,630
+Cluster2,R36,Chicken Republic - Oniru,"Oniru, Victoria Island",6.4306,3.4463,810
+Cluster2,R37,Chicken Republic - Ajah Market,"Ajah Market, Lekki",6.4702,3.5896,680
+Cluster2,R38,Chicken Republic - Ikoyi,"Awolowo Road, Ikoyi",6.4541,3.4216,720
+Cluster2,R9,Chicken Republic - Blue Island Resort Center,"KM 17, Blue Island Resort Center, Epe Expressway, Lekki, Lagos",6.4531,3.5744,600
+Cluster2,R4,Chicken Republic - Lekki 1,"4-18 Theophilus Oji Street, Lekki, Lagos",6.4393,3.4648,410
+Cluster2,R15,Chicken Republic - Lekki,"56-66 Yemi Adetayo St, Lagos",6.4312,3.4978,600
+Cluster2,R18,Chicken Republic - Lekki,"Francis Oje Cl, Lekki, Lagos",6.4483,3.5402,750
+Cluster2,R16,Chicken Republic - Lekki,"Chief Ganiu Enitan St Lekki, Lagos",6.4436,3.5417,620
+Cluster2,R19,Chicken Republic - Lekki,"10 Baale st Lekki, Lagos",6.449,3.548,500
+Cluster2,R21,Chicken Republic - Lekki,"Estend Rd 3 Lekki, Lagos",6.4434,3.5513,510
+Cluster2,R22,Chicken Republic - Lekki,"16B Layi Ajayi-Bembe Rd Lekki, Lagos",6.4607,3.4455,730
+Core,M1,Chicken Republic - Head Office (M1),"Sabo, Ojo, Lagos, Nigeria Lekki, Lagos",6.4808,3.1639,100000
+Core,W1,Chicken Republic - Warehouse (1),"Maroko/Ebute Metta(W) Lekki, Lagos",6.625,3.247,50000
+Core,W2,Chicken Republic - Distribution,"24 Ize Iyamu St, Ikeja, Lagos",6.6085,3.3639,50000
+Cluster1,D3,Chicken Republic - Gbagada,"95, Obanikoro Street, Gbagada, Lagos",6.5546,3.369,10000
+Cluster1,D1,Chicken Republic - Agidingbi,"Plot 34, Lateef Jakande Road, Agidingbi, Ikeja, Lagos",6.6205,3.3503,10000
+Cluster1,D2,Chicken Republic - Lagos Island Marina,"Oando, Lagos Island Marina, Lagos",6.45,3.4,10000
+Cluster2,D4,Chicken Republic - VGC Shopping Mall,"Odufunwa Rd Lakki, Lagos",6.4496,3.6118,10000
+Cluster2,D5,Chicken Republic - Lasode Lekki,"Adeniyi Jones Lekki Phase I, Lagos",6.4594,3.4698,10000
+Cluster2,D6,"Chicken Republic - Adeola Odeku, Victoria Island","Adeola Odeku Street, Victoria Island, Lagos",6.4273,3.4284,10000
