@@ -1,0 +1,4 @@
+Cluster,Vehicle Type,Capacity_KG,HighWay_Speed_KMperhour,CityRoad_Speed_KMperhour,Fuel_Consumption_at_max_load_kmpg,Fuel_consumption_at_zero_load_kmpg,additional_WearAndTear_at_Load,monthly_maintenance_cost
+Core,Lorry1,30000,60,15,6,11,0.35,860000
+Cluster1,Truck 1,5000,80,30,8,15,0.16,520000
+Cluster2,Truck 4,5000,80,30,8,15,0.16,520000

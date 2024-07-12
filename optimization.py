@@ -8,7 +8,8 @@ import os
 
 
 # Global variables for ACO and PSO parameters
-NUM_SIMULATIONS = 1  
+NUM_SIMULATIONS = 5  
+NUM_ITERATIONS = 5
 NUM_ANTS = 5         
 PARTICLE_POPULATION = 5  
 PHEROMONE_EVAPORATION_RATE = 0.5 
@@ -75,7 +76,7 @@ def calculate_fuel_consumption(distance, vehicle, current_load):
         (current_load / max_load) * fuel_max_load +
         (1 - current_load / max_load) * fuel_zero_load
     )
-    return fuel_consumption * distance
+    return  distance / fuel_consumption
 
 
 def calculate_cost(route, vehicle, distance_matrix, location_index_mapping):
@@ -93,7 +94,7 @@ def calculate_cost(route, vehicle, distance_matrix, location_index_mapping):
 
         # Calculate fuel consumption
         fuel_consumption = calculate_fuel_consumption(distance, vehicle, current_load)
-        total_cost += fuel_consumption
+        total_cost += fuel_consumption * 720 # -- This being the cost of fuel per  liter
 
         # Calculate wear and tear
         wear_tear_cost = distance * vehicle.additional_WearAndTear_at_Load * (current_load / vehicle.Capacity_KG)
@@ -109,15 +110,26 @@ def calculate_cost(route, vehicle, distance_matrix, location_index_mapping):
 
     return total_cost
 
-def aco(start_location, end_locations, vehicles, distance_matrix, pheromone_matrix, alpha=1, beta=5, evaporation_rate=0.5, deposit_rate=1.0, num_ants=50, iterations=100):
+def aco(start_location, end_locations, vehicles, distance_matrix, pheromone_matrix, simulation_folder, cluster ,alpha=1, beta=5, evaporation_rate=0.5, deposit_rate=1.0, num_ants=50, iterations=100):
     """Implements the Ant Colony Optimization algorithm."""
     best_route = None
     best_cost = float('inf')
+    current_vehicle = None
+    best_distance = float('inf')
+    total_fuel_consumed = float('inf')
 
     location_index_mapping = {code: idx for idx, code in enumerate(locations_df['code'])}
-
+    
 
     for _ in range(iterations):
+        # Log Each Iteration Info
+        print(f'    Interation {_}')
+        iteration_best_route = None
+        iteration_best_cost = float('inf')
+        iteration_end_locations = None
+        iteration_distance_matrix = None
+        iteration_current_vehicle =None
+
         # Create ant colony
         ants = [Ant(start_location, end_locations, vehicles, distance_matrix, pheromone_matrix, alpha, beta, location_index_mapping) for _ in range(num_ants)]
 
@@ -131,11 +143,28 @@ def aco(start_location, end_locations, vehicles, distance_matrix, pheromone_matr
 
         # Find the best route
         for ant in ants:
+          #  print(f'Simulation {_} : Cost {ant.total_cost} ')
             if ant.total_cost < best_cost:
                 best_cost = ant.total_cost
                 best_route = ant.route
+                best_distance = ant.total_distance
+                current_vehicle = ant.current_vehicle
+                total_fuel_consumed = ant.total_fuel_consumed
 
-    return best_route, best_cost
+            # Best in Iteration
+            if ant.total_cost < iteration_best_cost:
+                iteration_best_cost = ant.total_cost
+                iteration_best_route = ant.route
+                iteration_end_locations = ant.end_locations
+                iteration_distance_matrix = ant.distance_matrix
+                iteration_current_vehicle = ant.current_vehicle
+
+
+        
+        
+    
+    # simulation.to_csv(os.path.join(simulation_folder, f'simulation_{_}.csv'), index=False)
+    return total_fuel_consumed, current_vehicle ,best_distance, best_route, best_cost
 
 def pso(start_location, end_locations, vehicles, distance_matrix,  inertia_weight=0.7, cognitive_coefficient=1.5, social_coefficient=2.0, particle_population=50, iterations=100):
     """Implements the Particle Swarm Optimization algorithm."""
@@ -218,7 +247,7 @@ def choose_vehicle(end_locations, vehicles):
     # Select a vehicle randomly from the suitable vehicles
     return cluster_vehicles.sample(1).iloc[0]
 
-def run_simulations(start_location, end_locations, vehicles, distance_matrix, location_index_mapping, num_simulations=10):
+def run_simulations(start_location, end_locations, vehicles, distance_matrix, location_index_mapping, simulation_folder, cluster, num_simulations=10):
     """Runs multiple simulations for each optimization algorithm and returns the best route for each."""
     best_routes = {}
     best_costs = {}
@@ -228,32 +257,27 @@ def run_simulations(start_location, end_locations, vehicles, distance_matrix, lo
     print(f"Running ACO")
     best_routes["ACO"] = []
     best_costs["ACO"] = []
+    best_details = []
     for _ in range(num_simulations):
-        Initialize pheromone matrix
+        # Initialize pheromone matrix
+        print(f'Simulation {_}')
         pheromone_matrix = np.ones((len(locations_df), len(locations_df)))  # Set initial pheromone levels to 1
         
-        best_route, best_cost = aco(start_location, end_locations, vehicles, distance_matrix, pheromone_matrix, evaporation_rate=PHEROMONE_EVAPORATION_RATE, deposit_rate=PHEROMONE_DEPOSIT_RATE, num_ants=NUM_ANTS)
+        total_fuel_consumed, current_vehicle,best_distance, best_route, best_cost = aco(start_location, end_locations, vehicles, distance_matrix, pheromone_matrix,simulation_folder=simulation_folder, cluster= cluster, evaporation_rate=PHEROMONE_EVAPORATION_RATE, deposit_rate=PHEROMONE_DEPOSIT_RATE, num_ants=NUM_ANTS, iterations=NUM_ITERATIONS)
         best_routes["ACO"].append(best_route)
         best_costs["ACO"].append(best_cost)
+        # Save Data for the Simulation
+        
+        best_details.append( [f'Simulation_{_}' , best_distance, best_cost , total_fuel_consumed ,best_route ] )
+        output_folder =  os.path.join(simulation_folder, f'simulation_{_}')
+        os.makedirs(output_folder, exist_ok=True)     
+        visualize_route(best_route, current_vehicle, distance_matrix, output_folder, cluster)
+        save_route_data(best_route, current_vehicle, distance_matrix, output_folder, cluster, location_index_mapping, cycle_num=1)
 
-    # Run PSO simulations
-    print(f"Running PSO")
-    best_routes["PSO"] = []
-    best_costs["PSO"] = []
-    for _ in range(num_simulations):
-        best_route, best_cost = pso(start_location, end_locations, vehicles, distance_matrix ,  inertia_weight=INERTIA_WEIGHT, cognitive_coefficient=COGNITIVE_COEFFICIENT, social_coefficient=SOCIAL_COEFFICIENT, particle_population=PARTICLE_POPULATION)
-        best_routes["PSO"].append(best_route)
-        best_costs["PSO"].append(best_cost)
 
-    # Run Greedy Algorithm simulations
-    print(f"Running Greedy Algorithm")
-    best_routes["Greedy"] = []
-    best_costs["Greedy"] = []
-    for _ in range(num_simulations):
-        best_route = greedy_algorithm(start_location, end_locations, vehicles, distance_matrix)
-        best_cost = calculate_cost(best_route, choose_vehicle(end_locations, vehicles), distance_matrix , location_index_mapping)
-        best_routes["Greedy"].append(best_route)
-        best_costs["Greedy"].append(best_cost)
+    simulation_df = pd.DataFrame(best_details, columns=[ 'Simulation', 'Distance Traveled', 'Cost Incurred','Fuel Consumed', 'Best Route'])
+    simulation_df.to_csv(os.path.join(simulation_folder, f"simulation_data_{cluster}.csv"), index=False)
+  
 
     return best_routes, best_costs
 
@@ -298,18 +322,18 @@ def save_route_data(route, vehicle, distance_matrix, simulation_folder, cluster,
     total_fuel_consumed = 0
     total_maintenance_cost = 0
 
-    
+    item_cost = calculate_cost(route, vehicle, distance_matrix, location_index_mapping)
 
     for i in range(len(route) - 1):
         start_location = route[i]
         end_location = route[i + 1]
-        
-        distance = getDistance(start_location, end_location, distance_matrix, location_index_mapping)  # distance_matrix[start_location, end_location]
+        distance = getDistance(start_location, end_location, distance_matrix, location_index_mapping) # distance_matrix[start_location, end_location]
         total_distance += distance
 
         # Calculate fuel consumption
         fuel_consumption = calculate_fuel_consumption(distance, vehicle, current_load)
         total_fuel_consumed += fuel_consumption
+        total_cost += 720 * fuel_consumption
 
         # Calculate wear and tear
         wear_tear_cost = distance * vehicle.additional_WearAndTear_at_Load * (current_load / vehicle.Capacity_KG)
@@ -321,10 +345,10 @@ def save_route_data(route, vehicle, distance_matrix, simulation_folder, cluster,
 
         route_data.append([cycle_num, vehicle['Vehicle Type'], start_location, end_location, distance, current_load, fuel_consumption, wear_tear_cost])
 
-    # Calculate maintenance cost
-    maintenance_cost = calculate_maintenance_cost(total_distance, vehicle)
-    total_cost += maintenance_cost
-    total_maintenance_cost += maintenance_cost
+        # Calculate maintenance cost
+        maintenance_cost = calculate_maintenance_cost(total_distance, vehicle)
+   # total_cost += maintenance_cost
+        total_maintenance_cost += maintenance_cost
 
     # Create a Pandas DataFrame from the route data
     route_df = pd.DataFrame(route_data, columns=['Cycle', 'Vehicle Type', 'Start Location', 'End Location', 'Distance', 'Load at End', 'Fuel Consumed', 'Wear and Tear Cost'])
@@ -333,13 +357,16 @@ def save_route_data(route, vehicle, distance_matrix, simulation_folder, cluster,
     route_df.to_csv(os.path.join(simulation_folder, f"route_data_{cluster}.csv"), index=False)
 
     # Print a summary of the route
-    print(f"Cluster {cluster}:")
-    print(f"Vehicle Type: {vehicle['Vehicle Type']}")
-    print(f"Total Distance: {total_distance:.2f} km")
-    print(f"Total Fuel Consumed: {total_fuel_consumed:.2f} kmpg")
-    print(f"Total Maintenance Cost: {total_maintenance_cost:.2f}")
-    print(f"Total Cost: {total_cost:.2f}")
-    print(f"Route: {route}")
+    # print(f"Cluster {cluster}:")
+    # print(f"Vehicle Type: {vehicle['Vehicle Type']}")
+    # print(f"Total Distance: {total_distance:.2f} km")
+    # print(f"Total Fuel Consumed: {total_fuel_consumed:.2f} kmpg")
+    # print(f"Total Maintenance Cost: {total_maintenance_cost:.2f}")
+    # print(f"Total Wear and Tear Cost: {wear_tear_cost:.2f}")
+    # print(f"Total Cost of Fuel: { 720 * total_fuel_consumed :.2f}")
+    # print(f"Total Cost of item: {item_cost :.2f}")
+    # print(f"Total Cost of Trip: {total_cost + total_maintenance_cost  :.2f}")    
+    # print(f"Route: {route}")
     print()
 
 
@@ -355,7 +382,9 @@ class Ant:
         self.beta = beta
         self.route = [start_location]
         self.total_cost = 0
+        self.total_distance = 0
         self.current_load = 0
+        self.total_fuel_consumed = 0
         self.current_vehicle = None
         self.location_index_mapping = location_index_mapping
 
@@ -374,6 +403,9 @@ class Ant:
             self.route.append(next_location)
             self.current_load += locations_df['Capacity_KG'][locations_df[locations_df['code'] == next_location].index[0]]
             self.total_cost += calculate_cost([self.current_location, next_location], self.current_vehicle, self.distance_matrix, self.location_index_mapping)
+            distance = getDistance(self.current_location, next_location, self.distance_matrix, self.location_index_mapping)
+            self.total_distance += distance
+            self.total_fuel_consumed +=  calculate_fuel_consumption(distance, self.current_vehicle, self.current_load)
             self.current_location = next_location
             self.end_locations.remove(next_location)
 
@@ -388,9 +420,6 @@ class Ant:
             location_idx = self.location_index_mapping[location]
             distance = getDistance(current_location, location, self.distance_matrix, self.location_index_mapping)  # self.distance_matrix[current_location_idx, location_idx]
             pheromone = self.pheromone_matrix[current_location_idx, location_idx]
-            # print(f' from {current_location} to {location} distance = {distance}')
-            # distance = self.distance_matrix[current_location, location]
-            # pheromone = self.pheromone_matrix[current_location, location]
             probability = pheromone**self.alpha * (1/distance)**self.beta
             probabilities[i] = probability
             total_probability += probability
@@ -411,8 +440,6 @@ class Ant:
             end_idx = self.location_index_mapping[end_location]
             pheromone_matrix[start_idx, end_idx] *= (1 - evaporation_rate)
             pheromone_matrix[start_idx, end_idx] += deposit_rate / self.total_cost
-            # pheromone_matrix[start_location, end_location] *= (1 - evaporation_rate)
-            # pheromone_matrix[start_location, end_location] += deposit_rate / self.total_cost
 
 
 class Particle:
@@ -483,7 +510,7 @@ if __name__ == "__main__":
         vehicles = fleet_df[fleet_df['Cluster'] == cluster.replace(' ', '_')]
 
         # Run simulations and get the best routes
-        best_routes, best_costs = run_simulations(start_location, end_locations, vehicles, distance_matrix,location_index_mapping)
+        best_routes, best_costs = run_simulations(start_location, end_locations, vehicles, distance_matrix,location_index_mapping, simulation_folder, cluster= cluster, num_simulations = NUM_SIMULATIONS)
 
         # Find the best route across all algorithms
         best_algorithm = min(best_costs, key=best_costs.get)
