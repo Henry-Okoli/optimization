@@ -379,6 +379,8 @@ class Ant:
             location_idx = self.location_index_mapping[location]
             distance = getDistance(current_location, location, self.distance_matrix, self.location_index_mapping)  # self.distance_matrix[current_location_idx, location_idx]
             pheromone = self.pheromone_matrix[current_location_idx, location_idx]
+            if distance == 0:
+                print(current_location, location)
             probability = pheromone**self.alpha * (1/distance)**self.beta
             probabilities[i] = probability
             total_probability += probability
@@ -427,6 +429,13 @@ if __name__ == "__main__":
 
     # Step 3: We then get the Best Cost of Supplying all the RT from the Distribution Centers in the Cluster. 
 
+    outlets_cluster1 = locations_df[(locations_df['ClusterCode'] == 'Cluster1') & (locations_df['code'].str.startswith('R'))]['code'].tolist()
+    outlets_cluster2 = locations_df[(locations_df['ClusterCode'] == 'Cluster2') & (locations_df['code'].str.startswith('R'))]['code'].tolist()
+    
+    for cluster, dc_locations , outlet_locations in [('Cluster1', distributions_cluster1 , outlets_cluster1), ('Cluster2', distributions_cluster2 , outlets_cluster2)]:
+        for dc in dc_locations:
+                start_location = dc  # Go from the Warhouses
+                simulation('Distribution_RetailOutlet',cluster,start_location, outlet_locations)
 
     # Step 4: We iteratively eliminate one of the DCs and one of the vehichles and try the others repeatedly untill we are done so as to determine the least cost
     
