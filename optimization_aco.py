@@ -220,6 +220,7 @@ def visualize_route(route, vehicle, distance_matrix, simulation_folder, cluster)
     # Extract coordinates of all locations in the cluster
     cluster_locations = locations_df[locations_df['ClusterCode'] == cluster]
     cluster_coords = [(row['latitude'], row['longitude']) for _, row in cluster_locations.iterrows()]
+    cluster_codes = [row['code'] for _, row in cluster_locations.iterrows()]
 
     # Create a figure and axes
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -228,10 +229,14 @@ def visualize_route(route, vehicle, distance_matrix, simulation_folder, cluster)
     ax.plot(*zip(*route_coords), color='blue', marker='o', linestyle='-', linewidth=2, label='Route')
 
     # Plot all locations in the cluster
-    ax.scatter(*zip(*cluster_coords), color='red', marker='x', label='Locations')
+    # ax.scatter(*zip(*cluster_coords), color='red', marker='x', label='Locations')
+    # Plot all locations in the cluster with their codes
+    for (lat, lon), code in zip(cluster_coords, cluster_codes):
+        ax.scatter(lat, lon, color='red', marker='x')
+        ax.annotate(code, (lat, lon), textcoords="offset points", xytext=(0,5), ha='center')
 
     # Set plot title and labels
-    ax.set_title(f"Optimized Route - Cluster {cluster} - Vehicle: {vehicle['Vehicle Type']}")
+    ax.set_title(f"Optimized Route - {simulation_folder} - Vehicle: {vehicle['Vehicle Type']}")
     ax.set_xlabel("Longitude")
     ax.set_ylabel("Latitude")
 
@@ -434,16 +439,11 @@ if __name__ == "__main__":
     
     for cluster, dc_locations , outlet_locations in [('Cluster1', distributions_cluster1 , outlets_cluster1), ('Cluster2', distributions_cluster2 , outlets_cluster2)]:
         for dc in dc_locations:
-                start_location = dc  # Go from the Warhouses
+                start_location = dc  # Go from the each of the DC
                 simulation('Distribution_RetailOutlet',cluster,start_location, outlet_locations)
 
     # Step 4: We iteratively eliminate one of the DCs and one of the vehichles and try the others repeatedly untill we are done so as to determine the least cost
     
     
     
-    
-    # Define the start and end locations
-    start_location = 'M1'  # Core (M1)
-    end_locations_cluster1 = locations_df[locations_df['ClusterCode'] == 'Cluster1']['code'].tolist()
-    end_locations_cluster2 = locations_df[locations_df['ClusterCode'] == 'Cluster2']['code'].tolist()
-
+   
