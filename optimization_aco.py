@@ -1,4 +1,5 @@
 
+from collections import defaultdict
 import random
 import pandas as pd
 import numpy as np
@@ -307,6 +308,8 @@ def save_route_data(route, vehicle, distance_matrix, simulation_folder, cluster,
 
 def simulation(item_type, source, start_location, end_locations_cluster1  ):
         # Run simulations for each cluster
+    
+    best_costs = 0
     for cluster, end_locations in [(source, end_locations_cluster1)]:
         # Create a simulation folder
         simulation_folder = os.path.join(output_folder, item_type, start_location,  cluster)
@@ -331,7 +334,8 @@ def simulation(item_type, source, start_location, end_locations_cluster1  ):
         print(f"Best Algorithm for Cluster {cluster}: {best_algorithm}")
         print(f"Best Cost for Cluster {cluster}: {min(best_costs[best_algorithm])}")
         print()
-
+        best_costs = min(best_costs[best_algorithm])
+    return  best_costs
     
 
 class Ant:
@@ -409,15 +413,20 @@ class Ant:
 
 
 
-if __name__ == "__main__":
+if __name__ == "__main__": 
     
+    items = []
+
     # Step 1:   We Get the Cost of Supplying the Warehouses from the Purchase Center.  We start from the Purchase Center (M) and then travel to all the Warehouses in a Specific Cluster and supply them 
     start_location = 'M1'  # Core (M1)
     warehouses_cluster1 = locations_df[(locations_df['ClusterCode'] == 'Cluster1') & (locations_df['code'].str.startswith('W'))]['code'].tolist()
     warehouses_cluster2 = locations_df[(locations_df['ClusterCode'] == 'Cluster2') & (locations_df['code'].str.startswith('W'))]['code'].tolist()
+    #  'PC_Warehouse','Cluster1', 
     
-    simulation('PC_Warehouse','Cluster1', start_location,  warehouses_cluster1)
-    simulation('PC_Warehouse','Cluster2',start_location,  warehouses_cluster2)
+    best_cost = simulation('PC_Warehouse','Cluster1', start_location,  warehouses_cluster1)
+    items.append({'source': start_location , 'destination' : 'Warehouse' , 'Cluster': 'Cluster1' , 'cost': best_cost})
+    best_cost = simulation('PC_Warehouse','Cluster2',start_location,  warehouses_cluster2)
+    items.append({'source': start_location , 'destination' : 'Warehouse' , 'Cluster': 'Cluster2' , 'cost': best_cost})
 
 
     # Step 2: We get the Best Cost of Supplying all the Distribution Centers form the Warehouses in the Clusters
@@ -429,8 +438,8 @@ if __name__ == "__main__":
     for cluster, warehouse_locations , dist_locations in [('Cluster1', warehouses_cluster1 , distributions_cluster1), ('Cluster2', warehouses_cluster2 , distributions_cluster2)]:
         for Wh in warehouse_locations:
                 start_location = Wh  # Go from the Warhouses
-                simulation('Warehouse_Distribution',cluster,start_location, dist_locations)
-
+                best_cost = simulation('Warehouse_Distribution',cluster,start_location, dist_locations)
+                items.append({'source': start_location , 'destination' : 'Distribution' , 'Cluster': cluster , 'cost': best_cost})
 
     # Step 3: We then get the Best Cost of Supplying all the RT from the Distribution Centers in the Cluster. 
 
@@ -440,10 +449,28 @@ if __name__ == "__main__":
     for cluster, dc_locations , outlet_locations in [('Cluster1', distributions_cluster1 , outlets_cluster1), ('Cluster2', distributions_cluster2 , outlets_cluster2)]:
         for dc in dc_locations:
                 start_location = dc  # Go from the each of the DC
-                simulation('Distribution_RetailOutlet',cluster,start_location, outlet_locations)
+                best_cost = simulation('Distribution_RetailOutlet',cluster,start_location, outlet_locations)
+                items.append({'source': start_location , 'destination' : 'Outlet' , 'Cluster': cluster , 'cost': best_cost})
 
     # Step 4: We iteratively eliminate one of the DCs and one of the vehichles and try the others repeatedly untill we are done so as to determine the least cost
     
+    # Step 5: Let us output the best cost for the Clusters taking into consideration all the routes
+    cluster_costs = defaultdict(lambda: {'Warehouse': np.inf, 'Distribution': np.inf, 'Outlet': np.inf})
+
+    for item in items:
+        cluster = item['Cluster']
+        destination = item['destination']
+        cost = item['cost']
+        if cost < cluster_costs[cluster][destination]:
+            cluster_costs[cluster][destination] = cost
+
+    # Calculate the total cost for each cluster
+    total_costs = {}
+    for cluster, costs in cluster_costs.items():
+        total_costs[cluster] = sum(costs.values())
+
+    print(total_costs)
+    print(cluster_costs)
     
     
    
