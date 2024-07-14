@@ -19,37 +19,51 @@ INERTIA_WEIGHT = 0.7
 COGNITIVE_COEFFICIENT = 1.5 
 SOCIAL_COEFFICIENT = 2.0
 
+itype = '2W3DC'
 
+# Load location data
+locations_df = pd.read_csv(f"{itype}.csv")
+
+# Load fleet data
+fleet_df = pd.read_csv("fleet_Data.csv")
+
+# Create an output folder if it doesn't exist
+output_folder = f"{itype}/output"
+os.makedirs(output_folder, exist_ok=True)
 
 # Define function to calculate distance using haversine formula
 def calculate_distance(coord1, coord2):
     return haversine(coord1, coord2, unit=Unit.KILOMETERS)
 
-# Load location data
-locations_df = pd.read_csv("locations.csv")
 
-# Load fleet data
-fleet_df = pd.read_csv("fleet_Data.csv")
 
 # Create a dictionary to store location coordinates
 location_coords = {}
-for index, row in locations_df.iterrows():
-    location_coords[row['code']] = (row['latitude'], row['longitude'])
+
+# Helper Function
+def generate_cordinates(location_data):
+    coords = {}
+    for index, row in location_data.iterrows():
+        coords[row['code']] = (row['latitude'], row['longitude'])
+    return coords
 
 # Calculate distance matrix
 distance_matrix = np.zeros((len(locations_df), len(locations_df)))
-for i in range(len(locations_df)):
-    for j in range(len(locations_df)):
-        distance_matrix[i, j] = calculate_distance(location_coords[locations_df['code'][i]], location_coords[locations_df['code'][j]])
-# print(distance_matrix)
+
+def generate_distanceMatrix(location_data, coords):
+    dmatrix = np.zeros((len(location_data), len(location_data)))
+    for i in range(len(location_data)):
+        for j in range(len(location_data)):
+            dmatrix[i, j] = calculate_distance(coords[location_data['code'][i]], coords[location_data['code'][j]])
+    return dmatrix
 
 # Create a mapping dicitionary
-location_index_mapping = {code: idx for idx, code in enumerate(locations_df['code'])}
+location_index_mapping = {}
+def generate_index_mapping(location_data):
+    return {code: idx for idx, code in enumerate(location_data['code'])}
 
 
-# Create an output folder if it doesn't exist
-output_folder = "output"
-os.makedirs(output_folder, exist_ok=True)
+
 
 def route_to_indices(route, location_index_mapping):
     return [location_index_mapping[loc] for loc in route]
@@ -159,13 +173,12 @@ def aco(start_location, end_locations, vehicles, distance_matrix, pheromone_matr
     # simulation.to_csv(os.path.join(simulation_folder, f'simulation_{_}.csv'), index=False)
     return total_fuel_consumed, current_vehicle ,best_distance, best_route, best_cost
 
-
-
 def choose_vehicle(end_locations, vehicles):
     """Chooses a suitable vehicle based on capacity and cluster."""
     # Assuming that vehicles are assigned to clusters and cannot be moved between clusters
 
     # Identify the cluster of the end locations
+    #  print(end_locations)
     cluster = locations_df[locations_df['code'].isin(end_locations)]['ClusterCode'].unique()[0]
 
     # Filter vehicles based on cluster
@@ -310,6 +323,8 @@ def simulation(item_type, source, start_location, end_locations_cluster1  ):
         # Run simulations for each cluster
     
     best_costs = 0
+    if (end_locations_cluster1 == []):
+        return 0
     for cluster, end_locations in [(source, end_locations_cluster1)]:
         # Create a simulation folder
         simulation_folder = os.path.join(output_folder, item_type, start_location,  cluster)
@@ -337,6 +352,82 @@ def simulation(item_type, source, start_location, end_locations_cluster1  ):
         best_costs = min(best_costs[best_algorithm])
     return  best_costs
     
+    
+
+def baseRun():
+      
+    items = []
+
+    # Step 1:   We Get the Cost of Supplying the Warehouses from the Purchase Center.  We start from the Purchase Center (M) and then travel to all the Warehouses in a Specific Cluster and supply them 
+    start_location = 'M1'  # Core (M1)
+    warehouses_cluster1 = locations_df[(locations_df['ClusterCode'] == 'Cluster1') & (locations_df['code'].str.startswith('W'))]['code'].tolist()
+    warehouses_cluster2 = locations_df[(locations_df['ClusterCode'] == 'Cluster2') & (locations_df['code'].str.startswith('W'))]['code'].tolist()
+    #  'PC_Warehouse','Cluster1', 
+    
+    best_cost = simulation('PC_Warehouse','Cluster1', start_location,  warehouses_cluster1)
+    items.append({'source': start_location , 'destination' : 'Warehouse' , 'Cluster': 'Cluster1' , 'cost': best_cost})
+    best_cost = simulation('PC_Warehouse','Cluster2',start_location,  warehouses_cluster2)
+    items.append({'source': start_location , 'destination' : 'Warehouse' , 'Cluster': 'Cluster2' , 'cost': best_cost})
+
+
+    # Step 2: We get the Best Cost of Supplying all the Distribution Centers form the Warehouses in the Clusters
+
+    
+    distributions_cluster1 = locations_df[(locations_df['ClusterCode'] == 'Cluster1') & (locations_df['code'].str.startswith('D'))]['code'].tolist()
+    distributions_cluster2 = locations_df[(locations_df['ClusterCode'] == 'Cluster2') & (locations_df['code'].str.startswith('D'))]['code'].tolist()
+    
+    for cluster, warehouse_locations , dist_locations in [('Cluster1', warehouses_cluster1 , distributions_cluster1), ('Cluster2', warehouses_cluster2 , distributions_cluster2)]:
+        for Wh in warehouse_locations:
+                start_location = Wh  # Go from the Warhouses
+                best_cost = simulation('Warehouse_Distribution',cluster,start_location, dist_locations)
+                items.append({'source': start_location , 'destination' : 'Distribution' , 'Cluster': cluster , 'cost': best_cost})
+
+    # Step 3: We then get the Best Cost of Supplying all the RT from the Distribution Centers in the Cluster. 
+
+    outlets_cluster1 = locations_df[(locations_df['ClusterCode'] == 'Cluster1') & (locations_df['code'].str.startswith('R'))]['code'].tolist()
+    outlets_cluster2 = locations_df[(locations_df['ClusterCode'] == 'Cluster2') & (locations_df['code'].str.startswith('R'))]['code'].tolist()
+    
+    for cluster, dc_locations , outlet_locations in [('Cluster1', distributions_cluster1 , outlets_cluster1), ('Cluster2', distributions_cluster2 , outlets_cluster2)]:
+        for dc in dc_locations:
+                start_location = dc  # Go from the each of the DC
+                best_cost = simulation('Distribution_RetailOutlet',cluster,start_location, outlet_locations)
+                items.append({'source': start_location , 'destination' : 'Outlet' , 'Cluster': cluster , 'cost': best_cost})
+
+    # Step 4: We iteratively eliminate one of the DCs and one of the vehichles and try the others repeatedly untill we are done so as to determine the least cost
+    
+    # Step 5: Let us output the best cost for the Clusters taking into consideration all the routes
+    cluster_costs = defaultdict(lambda: {'Warehouse': np.inf, 'Distribution': np.inf, 'Outlet': np.inf})
+    rows = []
+
+    for item in items:
+        cluster = item['Cluster']
+        destination = item['destination']
+        cost = item['cost']
+        if cost < cluster_costs[cluster][destination]:
+            cluster_costs[cluster][destination] = cost
+
+            
+
+    # Calculate the total cost for each cluster
+    for cluster, values in cluster_costs.items():
+        warehouse = values['Warehouse']
+        distribution = values['Distribution']
+        outlet = values['Outlet']
+        total = warehouse + distribution + outlet
+        rows.append([cluster, warehouse, distribution, outlet, total])
+
+
+    print(rows)
+
+
+
+        
+    # Create DataFrame
+    df = pd.DataFrame(rows, columns=['Cluster', 'Warehouse Cost', 'Distribution Cost', 'Outlet Cost', 'Total Cost'])
+
+    # Save to CSV
+    df.to_csv(f'{output_folder}/summary.csv', index=False)   
+
 
 class Ant:
     def __init__(self, start_location, end_locations, vehicles, distance_matrix, pheromone_matrix, alpha, beta, location_index_mapping):
@@ -414,63 +505,50 @@ class Ant:
 
 
 if __name__ == "__main__": 
+    df = locations_df
     
-    items = []
+    location_coords = generate_cordinates(df)
+    distance_matrix = generate_distanceMatrix(df,location_coords)
+    location_index_mapping = generate_index_mapping(df)
 
-    # Step 1:   We Get the Cost of Supplying the Warehouses from the Purchase Center.  We start from the Purchase Center (M) and then travel to all the Warehouses in a Specific Cluster and supply them 
-    start_location = 'M1'  # Core (M1)
-    warehouses_cluster1 = locations_df[(locations_df['ClusterCode'] == 'Cluster1') & (locations_df['code'].str.startswith('W'))]['code'].tolist()
-    warehouses_cluster2 = locations_df[(locations_df['ClusterCode'] == 'Cluster2') & (locations_df['code'].str.startswith('W'))]['code'].tolist()
-    #  'PC_Warehouse','Cluster1', 
-    
-    best_cost = simulation('PC_Warehouse','Cluster1', start_location,  warehouses_cluster1)
-    items.append({'source': start_location , 'destination' : 'Warehouse' , 'Cluster': 'Cluster1' , 'cost': best_cost})
-    best_cost = simulation('PC_Warehouse','Cluster2',start_location,  warehouses_cluster2)
-    items.append({'source': start_location , 'destination' : 'Warehouse' , 'Cluster': 'Cluster2' , 'cost': best_cost})
+    # Run the Base
+    baseRun()
 
+    # Separate the data into clusters
+    clusters = df['ClusterCode'].unique()
 
-    # Step 2: We get the Best Cost of Supplying all the Distribution Centers form the Warehouses in the Clusters
+    # Process each cluster
+    for cluster in clusters:
+        cluster_df = df[df['ClusterCode'] == cluster]
+        
+        # Extract W and D codes
+        W_codes = cluster_df[cluster_df['code'].str.startswith('W')]['code'].tolist()
+        D_codes = cluster_df[cluster_df['code'].str.startswith('D')]['code'].tolist()
+        
+        # Generate combinations of 1 W and 1 D to eliminate
+        for w_code in W_codes:
+            for d_code in D_codes:
+                # Create a new dataframe excluding the selected W and D codes
+                new_df = cluster_df[~cluster_df['code'].isin([w_code, d_code])]
 
-    
-    distributions_cluster1 = locations_df[(locations_df['ClusterCode'] == 'Cluster1') & (locations_df['code'].str.startswith('D'))]['code'].tolist()
-    distributions_cluster2 = locations_df[(locations_df['ClusterCode'] == 'Cluster2') & (locations_df['code'].str.startswith('D'))]['code'].tolist()
-    
-    for cluster, warehouse_locations , dist_locations in [('Cluster1', warehouses_cluster1 , distributions_cluster1), ('Cluster2', warehouses_cluster2 , distributions_cluster2)]:
-        for Wh in warehouse_locations:
-                start_location = Wh  # Go from the Warhouses
-                best_cost = simulation('Warehouse_Distribution',cluster,start_location, dist_locations)
-                items.append({'source': start_location , 'destination' : 'Distribution' , 'Cluster': cluster , 'cost': best_cost})
+                # Ensure M1 is included in the new dataframe
+                if 'M1' not in new_df['code'].values:
+                    m1_row = df[df['code'] == 'M1']
+                    new_df = pd.concat([new_df, m1_row], ignore_index=True)
+                
+                # Save the new dataframe to a CSV file
+                itype = f'1W2DC - {w_code} and {d_code}'
+                new_df.to_csv(f"{itype}.csv", index=False)
+                
 
-    # Step 3: We then get the Best Cost of Supplying all the RT from the Distribution Centers in the Cluster. 
+                output_folder = f"{itype}/output"
+                os.makedirs(output_folder, exist_ok=True)
+                # Simulate for each new Data Frame
+                locations_df = pd.read_csv(f"{itype}.csv")
+                location_coords = generate_cordinates(locations_df)
+                distance_matrix = generate_distanceMatrix(locations_df,location_coords)
+                location_index_mapping = generate_index_mapping(locations_df)
 
-    outlets_cluster1 = locations_df[(locations_df['ClusterCode'] == 'Cluster1') & (locations_df['code'].str.startswith('R'))]['code'].tolist()
-    outlets_cluster2 = locations_df[(locations_df['ClusterCode'] == 'Cluster2') & (locations_df['code'].str.startswith('R'))]['code'].tolist()
-    
-    for cluster, dc_locations , outlet_locations in [('Cluster1', distributions_cluster1 , outlets_cluster1), ('Cluster2', distributions_cluster2 , outlets_cluster2)]:
-        for dc in dc_locations:
-                start_location = dc  # Go from the each of the DC
-                best_cost = simulation('Distribution_RetailOutlet',cluster,start_location, outlet_locations)
-                items.append({'source': start_location , 'destination' : 'Outlet' , 'Cluster': cluster , 'cost': best_cost})
+                baseRun()
 
-    # Step 4: We iteratively eliminate one of the DCs and one of the vehichles and try the others repeatedly untill we are done so as to determine the least cost
-    
-    # Step 5: Let us output the best cost for the Clusters taking into consideration all the routes
-    cluster_costs = defaultdict(lambda: {'Warehouse': np.inf, 'Distribution': np.inf, 'Outlet': np.inf})
-
-    for item in items:
-        cluster = item['Cluster']
-        destination = item['destination']
-        cost = item['cost']
-        if cost < cluster_costs[cluster][destination]:
-            cluster_costs[cluster][destination] = cost
-
-    # Calculate the total cost for each cluster
-    total_costs = {}
-    for cluster, costs in cluster_costs.items():
-        total_costs[cluster] = sum(costs.values())
-
-    print(total_costs)
-    print(cluster_costs)
-    
-    
-   
+        

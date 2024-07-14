@@ -4,7 +4,8 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from geopy.distance import geodesic
 
-folder =  'output/WarehouseI'
+folder =  'output/1W2DC'
+filename = '1W2DC'
 
 # Load the data
 df = pd.read_csv(folder + '.csv')
@@ -93,7 +94,7 @@ for cluster in clusters:
     warehouse_x = 2 if cluster == clusters[0] else -2
     warehouse_y_spacing = 10 / len(cluster_warehouses) if len(cluster_warehouses) > 1 else 1
     for i, node in enumerate(cluster_warehouses):
-        pos[node] = (warehouse_x, i * warehouse_y_spacing + 1.15)
+        pos[node] = (warehouse_x, i * warehouse_y_spacing + 2.5)
         node_colors.append(color_map[node[0]])
         node_sizes.append(1000)
 
@@ -125,7 +126,7 @@ nx.draw(G, pos, node_color=node_colors, node_size=node_sizes, with_labels=True, 
 edge_labels = {(u, v): f'{d:.3f}' for (u, v, d) in G.edges(data='weight')}
 nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=6)
 
-plt.title("Logistics Route Topology")
+plt.title(f"{filename} - Logistics Route Topology")
 plt.axis('off')
 # plt.tight_layout()
 
