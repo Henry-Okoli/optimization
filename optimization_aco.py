@@ -28,7 +28,7 @@ locations_df = pd.read_csv(f"{itype}.csv")
 fleet_df = pd.read_csv("fleet_Data.csv")
 
 # Create an output folder if it doesn't exist
-output_folder = f"{itype}/output"
+output_folder = f"output/{itype}"
 os.makedirs(output_folder, exist_ok=True)
 
 # Define function to calculate distance using haversine formula
