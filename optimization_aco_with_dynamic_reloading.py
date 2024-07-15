@@ -160,13 +160,11 @@ def aco(start_location, end_locations, vehicles, distance_matrix, pheromone_matr
 
     return total_fuel_consumed, current_vehicle, best_distance, best_route, best_cost
 
-
-
 def choose_vehicle(start_location, end_locations, vehicles):
     """Chooses a suitable vehicle based on capacity, cluster, and start location."""
     total_capacity_needed = sum(locations_df[locations_df['code'].isin(end_locations)]['Capacity_KG'])
     
-    if start_location.startswith('M'):
+    if start_location.startswith('M') or start_location.startswith('W'):
         cluster_vehicles = vehicles[vehicles['Cluster'] == 'Core']
     else:
         # Identify the cluster of the end locations
@@ -182,7 +180,6 @@ def choose_vehicle(start_location, end_locations, vehicles):
     else:
         # Select the smallest suitable vehicle to minimize costs
         return suitable_vehicles.loc[suitable_vehicles['Capacity_KG'].idxmin()]
-
 
 def run_simulations(start_location, end_locations, vehicles, distance_matrix, location_index_mapping, simulation_folder, cluster, locations_df, num_simulations=10):
     best_routes = {}
@@ -254,7 +251,6 @@ def visualize_route(route, vehicle, distance_matrix, simulation_folder, cluster)
     # Save the plot to the simulation folder
     plt.savefig(os.path.join(simulation_folder, f"route_visualization.png"))
     plt.close()
-
 
 def save_route_data(route, vehicle, distance_matrix, simulation_folder, cluster, location_index_mapping, cycle_num):
     """Saves the route data to a CSV file in the simulation folder."""
@@ -334,10 +330,10 @@ def simulation(item_type, source, start_location, end_locations_cluster1):
         return 0
     
     for cluster, end_locations in [(source, end_locations_cluster1)]:
-        simulation_folder = os.path.join(output_folder, item_type, start_location, cluster)
+        simulation_folder = os.path.join(output_folder,  item_type, start_location)
         os.makedirs(simulation_folder, exist_ok=True)
 
-        if start_location.startswith('M'):
+        if start_location.startswith('M') or start_location.startswith('W'):
             vehicles = fleet_df[fleet_df['Cluster'] == 'Core']
         else:
             vehicles = fleet_df[fleet_df['Cluster'] == cluster.replace(' ', '_')]
@@ -373,6 +369,7 @@ def baseRun():
     
     best_cost = simulation('PC_Warehouse','Cluster1', start_location,  warehouses_cluster1)
     items.append({'source': start_location , 'destination' : 'Warehouse' , 'Cluster': 'Cluster1' , 'cost': best_cost})
+    
     best_cost = simulation('PC_Warehouse','Cluster2',start_location,  warehouses_cluster2)
     items.append({'source': start_location , 'destination' : 'Warehouse' , 'Cluster': 'Cluster2' , 'cost': best_cost})
 
@@ -400,8 +397,6 @@ def baseRun():
                 best_cost = simulation('Distribution_RetailOutlet',cluster,start_location, outlet_locations)
                 items.append({'source': start_location , 'destination' : 'Outlet' , 'Cluster': cluster , 'cost': best_cost})
 
-    # Step 4: We iteratively eliminate one of the DCs and one of the vehichles and try the others repeatedly untill we are done so as to determine the least cost
-    
     # Step 5: Let us output the best cost for the Clusters taking into consideration all the routes
     cluster_costs = defaultdict(lambda: {'Warehouse': np.inf, 'Distribution': np.inf, 'Outlet': np.inf})
     rows = []
@@ -462,7 +457,6 @@ class Ant:
         self.start_type = start_location[0]  # 'M', 'W', or 'D'
         self.end_type = end_locations[0][0] if end_locations else None  # 'W', 'D', or 'R'
 
-
     def construct_route(self, max_iterations=1000):
         iterations = 0
         while self.unserviced_locations and iterations < max_iterations:
@@ -519,7 +513,6 @@ class Ant:
         print(f"Route construction completed in {iterations} iterations.")
         print(f"Final route: {self.route}")
         print(f"Remaining unserviced locations: {self.unserviced_locations}")
-
     
     def select_next_location(self):
         probabilities = self.calculate_probabilities()
@@ -631,14 +624,17 @@ if __name__ == "__main__":
                     new_df = pd.concat([new_df, m1_row], ignore_index=True)
                 
                 # Save the new dataframe to a CSV file
+                os.makedirs('input', exist_ok=True)
                 itype = f'1W2DC - {w_code} and {d_code}'
-                new_df.to_csv(f"{itype}.csv", index=False)
+                new_df.to_csv(f"input/{itype}.csv", index=False)
                 
 
-                output_folder = f"output/{itype}"
+                output_folder = f"output/{cluster}/{itype}"
                 os.makedirs(output_folder, exist_ok=True)
+
+                
                 # Simulate for each new Data Frame
-                locations_df = pd.read_csv(f"{itype}.csv")
+                locations_df = pd.read_csv(f"input/{itype}.csv")
                 location_coords = generate_cordinates(locations_df)
                 distance_matrix = generate_distanceMatrix(locations_df,location_coords)
                 location_index_mapping = generate_index_mapping(locations_df)
