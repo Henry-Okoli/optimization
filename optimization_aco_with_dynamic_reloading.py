@@ -269,14 +269,15 @@ def save_route_data(route, vehicle, distance_matrix, simulation_folder, cluster,
 
     for i in range(len(route) - 1):
         start_location = route[i]
-        end_location = route[i + 1]
+        end_location = route[i+1]
         distance = getDistance(start_location, end_location, distance_matrix, location_index_mapping)
         total_distance += distance
 
         # Calculate fuel consumption
         fuel_consumption = calculate_fuel_consumption(distance, vehicle, current_load)
         total_fuel_consumed += fuel_consumption
-        total_cost += 720 * fuel_consumption
+        fuel_cost = 720 * fuel_consumption
+        total_cost += fuel_cost
 
         # Calculate wear and tear
         wear_tear_cost = distance * vehicle.additional_WearAndTear_at_Load * (current_load / vehicle.Capacity_KG)
@@ -284,17 +285,17 @@ def save_route_data(route, vehicle, distance_matrix, simulation_folder, cluster,
 
         # Calculate load change
         end_location_index = locations_df[locations_df['code'] == end_location].index[0]
-        load_change = locations_df['Capacity_KG'][end_location_index]
+        location_capacity = locations_df['Capacity_KG'][end_location_index]
 
         # Determine if location is for discharge or restock
         if end_location.startswith('D') or end_location.startswith('W'):
             # This is a distribution center or warehouse, so we restock
-            discharged_restocked = load_change
+            discharged_restocked = vehicle.Capacity_KG - current_load
             new_load = vehicle.Capacity_KG
         else:
             # This is a retail outlet, so we discharge
-            discharged_restocked = -load_change
-            new_load = max(0, current_load - load_change)  # Ensure load doesn't go negative
+            discharged_restocked = -min(current_load, location_capacity)
+            new_load = max(0, current_load - location_capacity)
 
         route_data.append([
             cycle_num, 
@@ -456,35 +457,46 @@ class Ant:
         # Choose the appropriate vehicle based on the start location
         self.current_vehicle = choose_vehicle(start_location, end_locations, vehicles)
         self.current_load = self.current_vehicle['Capacity_KG']
+        self.location_demands = dict(zip(locations_df['code'], locations_df['Capacity_KG']))
+        self.unserviced_locations = set(end_locations)
+        self.start_type = start_location[0]  # 'M', 'W', or 'D'
+        self.end_type = end_locations[0][0] if end_locations else None  # 'W', 'D', or 'R'
 
-    def construct_route(self, max_iterations=100):
+
+    def construct_route(self, max_iterations=1000):
         iterations = 0
-        start_is_m = self.start_location.startswith('M')
-
-        while self.end_locations and iterations < max_iterations:
+        while self.unserviced_locations and iterations < max_iterations:
             iterations += 1
             
-            if start_is_m and self.current_location == self.start_location:
+            if iterations % 100 == 0:
+                print(f"Iteration {iterations}: Current location {self.current_location}, Remaining locations: {self.unserviced_locations}")
+
+            if self.start_type == 'M' and self.current_location == self.start_location:
                 next_location = self.force_end_location_visit()
             else:
                 next_location = self.select_next_location()
 
-            print(f"Iteration {iterations}: Working on Location {next_location}")
+            if next_location is None:
+                print(f"No valid next location found. Breaking loop.")
+                break
 
             if next_location in self.distribution_centers:
                 self.route.append(next_location)
                 self.current_load = self.current_vehicle['Capacity_KG']
                 print(f"Restocked at DC {next_location}. Current load: {self.current_load}")
             else:
-                required_load = self.location_capacities[next_location]
+                required_load = self.location_demands[next_location]
                 
                 if self.current_load >= required_load:
                     self.route.append(next_location)
                     self.current_load -= required_load
-                    self.end_locations.remove(next_location)
+                    self.unserviced_locations.remove(next_location)
                     print(f"Serviced {next_location}. Remaining load: {self.current_load}")
                 else:
                     nearest_dc = self.find_nearest_dc()
+                    if nearest_dc == self.current_location:
+                        print(f"Already at nearest DC {nearest_dc}. Breaking loop to avoid infinite restocking.")
+                        break
                     self.route.append(nearest_dc)
                     self.current_load = self.current_vehicle['Capacity_KG']
                     print(f"Insufficient load. Restocked at nearest DC {nearest_dc}")
@@ -492,19 +504,32 @@ class Ant:
             self.update_costs(self.route[-2], self.route[-1])
             self.current_location = self.route[-1]
 
+            # Check if we're stuck in a loop
+            if len(self.route) > 3 and len(set(self.route[-3:])) == 2:
+                print("Detected a potential loop. Forcing a jump to an unserviced location.")
+                if self.unserviced_locations:
+                    forced_location = random.choice(list(self.unserviced_locations))
+                    self.route.append(forced_location)
+                    self.current_location = forced_location
+                    self.current_load = max(0, self.current_load - self.location_demands[forced_location])
+                    self.unserviced_locations.remove(forced_location)
+
         if iterations == max_iterations:
             print(f"Warning: Maximum iterations ({max_iterations}) reached. Route may be incomplete.")
         print(f"Route construction completed in {iterations} iterations.")
         print(f"Final route: {self.route}")
-        print(f"Remaining end locations: {self.end_locations}")
+        print(f"Remaining unserviced locations: {self.unserviced_locations}")
 
     
     def select_next_location(self):
         probabilities = self.calculate_probabilities()
         if not probabilities:
-            # If no valid probabilities, prioritize end locations over distribution centers
-            available_locations = list(self.end_locations) + list(self.distribution_centers)
-            return random.choice(available_locations)
+            # If no valid probabilities, try to find any unserviced location or distribution center
+            available_locations = list(self.unserviced_locations) + list(self.distribution_centers)
+            if available_locations:
+                return random.choice(available_locations)
+            else:
+                return None  # No valid location found
         return random.choices(list(probabilities.keys()), weights=probabilities.values(), k=1)[0]
 
     def force_end_location_visit(self):
@@ -517,7 +542,7 @@ class Ant:
         probabilities = {}
         total_probability = 0
         
-        for location in self.end_locations | self.distribution_centers:
+        for location in self.unserviced_locations | self.distribution_centers:
             if location == self.current_location:
                 continue
             
@@ -528,10 +553,17 @@ class Ant:
             pheromone = self.pheromone_matrix[self.location_index_mapping[self.current_location]][self.location_index_mapping[location]]
             probability = pheromone**self.alpha * (1/distance)**self.beta
             
-            if location in self.end_locations:
-                required_load = self.location_capacities[location]
+            if location in self.unserviced_locations:
+                required_load = self.location_demands[location]
                 if self.current_load >= required_load:
-                    probability *= 3.0  # Strongly favor serviceable end locations
+                    probability *= 3.0  # Strongly favor serviceable locations
+                else:
+                    probability *= 0.5  # Reduce probability for locations we can't fully service
+            elif location in self.distribution_centers:
+                if self.current_load < 0.2 * self.current_vehicle['Capacity_KG']:
+                    probability *= 2.0  # Favor distribution centers when load is low
+                elif self.start_type in ['M', 'W'] and self.end_type in ['W', 'D']:
+                    probability *= 1.5  # Slightly favor distribution centers for M->W and W->D routes
             
             probabilities[location] = probability
             total_probability += probability
