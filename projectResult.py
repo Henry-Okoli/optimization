@@ -41,4 +41,29 @@ for (level_1, level_2), group in grouped:
     output_path = os.path.join(output_folder, output_filename)
     group.to_csv(output_path, index=False)
 
+# Save the Final Result Summary
+groupedX = combined_df.groupby(['subdirectory_level_1', 'subdirectory_level_2', 'subdirectory_level_4'])
+
+for (level_1, level_2, level_4), group in groupedX:
+    # Step 1: Split the string in subdirectory_level_3 by " - " and keep only the first part
+    group['subdirectory_level_3'] = group['subdirectory_level_3'].apply(lambda x: x.split(" - ")[0])
+    
+    # Step 2: Create a folder with a combination of subdirectory_level_1 + subdirectory_level_2
+   # level_2 = group['subdirectory_level_2'].iloc[0]
+    # folder_name = f"{level_1}_{level_2}"
+    folder_path = os.path.join(base_dir, "result", "summary", level_1, level_2)
+    os.makedirs(folder_path, exist_ok=True)
+    
+    # Step 3: Find the rows with the minimum Cost Incurred for each subdirectory_level_4 group
+    idx_min_cost = group.groupby('subdirectory_level_4')['Cost Incurred'].idxmin()
+    min_cost_df = group.loc[idx_min_cost, ['subdirectory_level_4', 'Distance Traveled', 'Cost Incurred', 'Fuel Consumed', 'Best Route']]
+    
+    # Step 4: Save the output of step 3 in the file created in step 2
+    output_filename = f"{level_1}_{level_4}_min_cost.csv"
+    output_path = os.path.join(folder_path, output_filename)
+    min_cost_df.to_csv(output_path, index=False)
+
+
+
+
 print("Combining and grouping complete.")

@@ -28,7 +28,7 @@ fleet_df = pd.read_csv("fleet_Data.csv")
 
 # Create an output folder if it doesn't exist
 output_folder = f"output/pso/{itype}"
-os.makedirs(output_folder, exist_ok=True)
+# os.makedirs(output_folder, exist_ok=True)
 
 # Define function to calculate distance using haversine formula
 def calculate_distance(coord1, coord2):
@@ -487,15 +487,30 @@ class Particle:
 if __name__ == "__main__": 
     df = locations_df
     
-    location_coords = generate_cordinates(df)
-    distance_matrix = generate_distanceMatrix(df,location_coords)
-    location_index_mapping = generate_index_mapping(df)
-
-    # Run the Base
-    baseRun()
 
     # Separate the data into clusters
-    clusters = df['ClusterCode'].unique()
+    clusters = [cluster for cluster in df['ClusterCode'].unique() if cluster != 'Core']
+    for cluster in clusters:
+        cluster_df = df[df['ClusterCode'] == cluster]
+        # Ensure M1 is included in the new dataframe
+        if 'M1' not in cluster_df['code'].values:
+            m1_row = df[df['code'] == 'M1']
+            cluster_df = pd.concat([cluster_df, m1_row], ignore_index=True)  
+  
+    
+        cluster_df.to_csv(f"input/{itype}_{cluster}.csv", index=False)    
+        locations_df = pd.read_csv(f"input/{itype}_{cluster}.csv")
+        output_folder = f"output/pso/{cluster}/{itype}"
+        os.makedirs(output_folder, exist_ok=True)
+        location_coords = generate_cordinates(locations_df)
+        distance_matrix = generate_distanceMatrix(locations_df,location_coords)
+        location_index_mapping = generate_index_mapping(locations_df)
+
+        # Run the Base
+        baseRun()
+
+
+
 
     # Process each cluster
     for cluster in clusters:
