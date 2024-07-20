@@ -8,9 +8,10 @@ import matplotlib.pyplot as plt
 import os
 
 
-# Global variables for PSO 
-NUM_SIMULATIONS = 3
-NUM_ITERATIONS = 5  
+# Global variables for ACO 
+NUM_SIMULATIONS = 3  
+NUM_ITERATIONS = 3
+NUM_ANTS = 2         
 PARTICLE_POPULATION = 5  
 PHEROMONE_EVAPORATION_RATE = 0.5 
 PHEROMONE_DEPOSIT_RATE = 1.0
@@ -27,7 +28,7 @@ locations_df = pd.read_csv(f"{itype}.csv")
 fleet_df = pd.read_csv("fleet_Data.csv")
 
 # Create an output folder if it doesn't exist
-output_folder = f"output/pso/{itype}"
+output_folder = f"output/aco/{itype}"
 # os.makedirs(output_folder, exist_ok=True)
 
 # Define function to calculate distance using haversine formula
@@ -85,7 +86,7 @@ def calculate_fuel_consumption(distance, vehicle, current_load):
         (current_load / max_load) * fuel_max_load +
         (1 - current_load / max_load) * fuel_zero_load
     )
-    return  distance / fuel_consumption
+    return    distance / fuel_consumption
 
 def calculate_cost(route, vehicle, distance_matrix, location_index_mapping):
     """Calculates the total cost of a route, including fuel, wear and tear, and maintenance."""
@@ -118,6 +119,49 @@ def calculate_cost(route, vehicle, distance_matrix, location_index_mapping):
 
     return total_cost
 
+def aco(start_location, end_locations, vehicles, distance_matrix, pheromone_matrix, simulation_folder, cluster, locations_df, alpha=1, beta=5, evaporation_rate=0.5, deposit_rate=1.0, num_ants=50, iterations=100):
+    best_route = None
+    best_cost = float('inf')
+    current_vehicle = None
+    best_distance = float('inf')
+    total_fuel_consumed = float('inf')
+
+    location_index_mapping = {code: idx for idx, code in enumerate(locations_df['code'])}
+
+    # Determine distribution centers based on start location
+    if start_location.startswith('M'):
+        distribution_centers = set()
+        distribution_centers.add(start_location)
+    elif start_location.startswith('W'):
+        distribution_centers = set()
+        distribution_centers.add(start_location)
+    else:
+        distribution_centers = set(locations_df[(locations_df['ClusterCode'] == cluster) & (locations_df['code'].str.startswith('D'))]['code'])
+
+    for _ in range(iterations):
+        print(f'    Iteration {_}')
+
+        ants = [Ant(start_location, end_locations, vehicles, distance_matrix, pheromone_matrix, alpha, beta, location_index_mapping, locations_df, distribution_centers) for _ in range(num_ants)]
+
+        for ant in ants:
+            ant.construct_route()
+
+            if ant.total_cost < best_cost:
+                best_cost = ant.total_cost
+                best_route = ant.route
+                best_distance = ant.total_distance
+                current_vehicle = ant.current_vehicle
+                total_fuel_consumed = ant.total_fuel_consumed
+
+        for ant in ants:
+            ant.update_pheromone(pheromone_matrix, evaporation_rate, deposit_rate)
+
+        # Save only the best ant's data for this iteration
+        iteration_pd = pd.DataFrame([[best_cost, best_distance, total_fuel_consumed, best_route]], 
+                                    columns=['total_cost', 'total_distance', 'total_fuel_consumed', 'route'])
+        iteration_pd.to_csv(os.path.join(simulation_folder, f'ants_iteration{_}.csv'), index=False)
+
+    return total_fuel_consumed, current_vehicle, best_distance, best_route, best_cost
 
 def choose_vehicle(start_location, end_locations, vehicles):
     """Chooses a suitable vehicle based on capacity, cluster, and start location."""
@@ -144,9 +188,9 @@ def run_simulations(start_location, end_locations, vehicles, distance_matrix, lo
     best_routes = {}
     best_costs = {}
 
-    print(f"Running {num_simulations} PSO simulations for {cluster}")
-    best_routes["PSO"] = []
-    best_costs["PSO"] = []
+    print(f"Running {num_simulations} ACO simulations for {cluster}")
+    best_routes["ACO"] = []
+    best_costs["ACO"] = []
     best_details = []
 
     for sim in range(num_simulations):
@@ -154,14 +198,17 @@ def run_simulations(start_location, end_locations, vehicles, distance_matrix, lo
         output_folder = os.path.join(simulation_folder, f'simulation_{sim}')
         os.makedirs(output_folder, exist_ok=True)
         
+        pheromone_matrix = np.ones((len(locations_df), len(locations_df)))  # Set initial pheromone levels to 1
         
-        total_fuel_consumed, current_vehicle, best_distance, best_route, best_cost = pso(
-            start_location, end_locations, vehicles, distance_matrix, 
-            simulation_folder=output_folder, cluster=cluster, locations_df=locations_df
+        total_fuel_consumed, current_vehicle, best_distance, best_route, best_cost = aco(
+            start_location, end_locations, vehicles, distance_matrix, pheromone_matrix,
+            simulation_folder=output_folder, cluster=cluster, locations_df=locations_df,
+            evaporation_rate=PHEROMONE_EVAPORATION_RATE, deposit_rate=PHEROMONE_DEPOSIT_RATE,
+            num_ants=NUM_ANTS, iterations=NUM_ITERATIONS
         )
         
-        best_routes["PSO"].append(best_route)
-        best_costs["PSO"].append(best_cost)
+        best_routes["ACO"].append(best_route)
+        best_costs["ACO"].append(best_cost)
         
         best_details.append([f'Simulation_{sim}', best_distance, best_cost, total_fuel_consumed, best_route])
      
@@ -386,106 +433,171 @@ def baseRun():
     # Save to CSV
     df.to_csv(f'{output_folder}/summary.csv', index=False)   
 
-def pso(start_location, end_locations, vehicles, distance_matrix, simulation_folder, cluster, locations_df, num_particles=PARTICLE_POPULATION, iterations=NUM_ITERATIONS):
-    location_index_mapping = {code: idx for idx, code in enumerate(locations_df['code'])}
-    distribution_centers = set(locations_df[locations_df['code'].str.startswith('D')]['code'])
-    distribution_centers.add(start_location)
-
-    particles = [Particle(start_location, end_locations, vehicles, distance_matrix, location_index_mapping, locations_df, distribution_centers) for _ in range(num_particles)]
-
-    global_best_position = None
-    global_best_cost = float('inf')
-
-    for iteration in range(iterations):
-        for particle in particles:
-            cost = particle.evaluate()
-            if cost < global_best_cost:
-                global_best_cost = cost
-                global_best_position = particle.position.copy()
-
-        for particle in particles:
-            particle.update_velocity(global_best_position, INERTIA_WEIGHT, COGNITIVE_COEFFICIENT, SOCIAL_COEFFICIENT)
-            particle.update_position()
-
-        # Save data for this iteration
-        iteration_pd = pd.DataFrame([[global_best_cost, global_best_position]], 
-                                    columns=['total_cost', 'route'])
-        iteration_pd.to_csv(os.path.join(simulation_folder, f'pso_iteration{iteration}.csv'), index=False)
-
-    best_route = global_best_position
-    best_cost = global_best_cost
-    current_vehicle = choose_vehicle(start_location, end_locations, vehicles)
-    best_distance = sum(getDistance(best_route[i], best_route[i+1], distance_matrix, location_index_mapping) for i in range(len(best_route)-1))
-    total_fuel_consumed = sum(calculate_fuel_consumption(getDistance(best_route[i], best_route[i+1], distance_matrix, location_index_mapping), current_vehicle, current_vehicle['Capacity_KG']) for i in range(len(best_route)-1))
-
-    return total_fuel_consumed, current_vehicle, best_distance, best_route, best_cost
-
-class Particle:
-    def __init__(self, start_location, end_locations, vehicles, distance_matrix, location_index_mapping, locations_df, distribution_centers):
+class Ant:
+    def __init__(self, start_location, end_locations, vehicles, distance_matrix, pheromone_matrix, alpha, beta, location_index_mapping, locations_df, distribution_centers):
         self.start_location = start_location
-        self.end_locations = list(end_locations)  # Convert to list for indexing
+        self.current_location = start_location
+        self.end_locations = set(end_locations)
         self.vehicles = vehicles
         self.distance_matrix = distance_matrix
+        self.pheromone_matrix = pheromone_matrix
+        self.alpha = alpha
+        self.beta = beta
+        self.route = [start_location]
+        self.total_cost = 0
+        self.total_distance = 0
+        self.total_fuel_consumed = 0
         self.location_index_mapping = location_index_mapping
         self.locations_df = locations_df
         self.distribution_centers = distribution_centers
         self.location_capacities = dict(zip(locations_df['code'], locations_df['Capacity_KG']))
         self.precomputed_distances = defaultdict(dict)
+        # Choose the appropriate vehicle based on the start location
         self.current_vehicle = choose_vehicle(start_location, end_locations, vehicles)
         self.current_load = self.current_vehicle['Capacity_KG']
         self.location_demands = dict(zip(locations_df['code'], locations_df['Capacity_KG']))
         self.unserviced_locations = set(end_locations)
-        self.start_type = start_location[0]
-        self.end_type = end_locations[0][0] if end_locations else None
+        self.start_type = start_location[0]  # 'M', 'W', or 'D'
+        self.end_type = end_locations[0][0] if end_locations else None  # 'W', 'D', or 'R'
 
-        self.position = self.initialize_position()
-        self.velocity = self.initialize_velocity()
-        self.best_position = self.position.copy()
-        self.best_cost = float('inf')
+    def construct_route(self, max_iterations=1000):
+        iterations = 0
+        while self.unserviced_locations and iterations < max_iterations:
+            iterations += 1
+            
+            if iterations % 100 == 0:
+                print(f"Iteration {iterations}: Current location {self.current_location}, Remaining locations: {self.unserviced_locations}")
 
-    def initialize_position(self):
-        return [self.start_location] + random.sample(self.end_locations, len(self.end_locations))
-
-    def initialize_velocity(self):
-        return [random.uniform(-1, 1) for _ in range(len(self.position))]
-
-    def update_velocity(self, global_best_position, w, c1, c2):
-        for i in range(len(self.velocity)):
-            r1, r2 = random.random(), random.random()
-            cognitive = c1 * r1 * (self.position.index(self.best_position[i]) - self.position.index(self.position[i]))
-            social = c2 * r2 * (self.position.index(global_best_position[i]) - self.position.index(self.position[i]))
-            self.velocity[i] = w * self.velocity[i] + cognitive + social
-
-    def update_position(self):
-        new_position = [self.start_location]
-        remaining_locations = self.position[1:]
-        
-        for _ in range(len(self.position) - 1):
-            if not remaining_locations:
-                break
-            probabilities = [abs(self.velocity[self.position.index(loc)]) for loc in remaining_locations]
-            total_prob = sum(probabilities)
-            if total_prob == 0:
-                next_location = random.choice(remaining_locations)
+            if self.start_type == 'M' and self.current_location == self.start_location:
+                next_location = self.force_end_location_visit()
             else:
-                probabilities = [p / total_prob for p in probabilities]
-                next_location = random.choices(remaining_locations, weights=probabilities, k=1)[0]
-            new_position.append(next_location)
-            remaining_locations.remove(next_location)
+                next_location = self.select_next_location()
+
+            if next_location is None:
+                print(f"No valid next location found. Breaking loop.")
+                break
+
+            if next_location in self.distribution_centers:
+                self.route.append(next_location)
+                self.current_load = self.current_vehicle['Capacity_KG']
+                print(f"Restocked at DC {next_location}. Current load: {self.current_load}")
+            else:
+                required_load = self.location_demands[next_location]
+                
+                if self.current_load >= required_load:
+                    self.route.append(next_location)
+                    self.current_load -= required_load
+                    self.unserviced_locations.remove(next_location)
+                    print(f"Serviced {next_location}. Remaining load: {self.current_load}")
+                else:
+                    nearest_dc = self.find_nearest_dc()
+                    if nearest_dc == self.current_location:
+                        print(f"Already at nearest DC {nearest_dc}. Breaking loop to avoid infinite restocking.")
+                        break
+                    self.route.append(nearest_dc)
+                    self.current_load = self.current_vehicle['Capacity_KG']
+                    print(f"Insufficient load. Restocked at nearest DC {nearest_dc}")
+            
+            self.update_costs(self.route[-2], self.route[-1])
+            self.current_location = self.route[-1]
+
+            # Check if we're stuck in a loop
+            if len(self.route) > 3 and len(set(self.route[-3:])) == 2:
+                print("Detected a potential loop. Forcing a jump to an unserviced location.")
+                if self.unserviced_locations:
+                    forced_location = random.choice(list(self.unserviced_locations))
+                    self.route.append(forced_location)
+                    self.current_location = forced_location
+                    self.current_load = max(0, self.current_load - self.location_demands[forced_location])
+                    self.unserviced_locations.remove(forced_location)
+
+        if iterations == max_iterations:
+            print(f"Warning: Maximum iterations ({max_iterations}) reached. Route may be incomplete.")
+        print(f"Route construction completed in {iterations} iterations.")
+        print(f"Final route: {self.route}")
+        print(f"Remaining unserviced locations: {self.unserviced_locations}")
+    
+    def select_next_location(self):
+        probabilities = self.calculate_probabilities()
+        if not probabilities:
+            # If no valid probabilities, try to find any unserviced location or distribution center
+            available_locations = list(self.unserviced_locations) + list(self.distribution_centers)
+            if available_locations:
+                return random.choice(available_locations)
+            else:
+                return None  # No valid location found
+        return random.choices(list(probabilities.keys()), weights=probabilities.values(), k=1)[0]
+
+    def force_end_location_visit(self):
+        if self.end_locations:
+            return min(self.end_locations, key=lambda loc: self.get_distance(self.current_location, loc))
+        return self.find_nearest_dc()
+
+    
+    def calculate_probabilities(self):
+        probabilities = {}
+        total_probability = 0
         
-        self.position = new_position
+        for location in self.unserviced_locations | self.distribution_centers:
+            if location == self.current_location:
+                continue
+            
+            distance = self.get_distance(self.current_location, location)
+            if distance == 0:
+                continue
+            
+            pheromone = self.pheromone_matrix[self.location_index_mapping[self.current_location]][self.location_index_mapping[location]]
+            probability = pheromone**self.alpha * (1/distance)**self.beta
+            
+            if location in self.unserviced_locations:
+                required_load = self.location_demands[location]
+                if self.current_load >= required_load:
+                    probability *= 3.0  # Strongly favor serviceable locations
+                else:
+                    probability *= 0.5  # Reduce probability for locations we can't fully service
+            elif location in self.distribution_centers:
+                if self.current_load < 0.2 * self.current_vehicle['Capacity_KG']:
+                    probability *= 2.0  # Favor distribution centers when load is low
+                elif self.start_type in ['M', 'W'] and self.end_type in ['W', 'D']:
+                    probability *= 1.5  # Slightly favor distribution centers for M->W and W->D routes
+            
+            probabilities[location] = probability
+            total_probability += probability
 
-    def evaluate(self):
-        cost = calculate_cost(self.position, self.current_vehicle, self.distance_matrix, self.location_index_mapping)
-        if cost < self.best_cost:
-            self.best_cost = cost
-            self.best_position = self.position.copy()
-        return cost
+        if total_probability == 0:
+            return {}
+        
+        return {k: v / total_probability for k, v in probabilities.items()}
 
+    def find_nearest_dc(self):
+        return min(self.distribution_centers, key=lambda dc: self.get_distance(self.current_location, dc))
+
+    def get_distance(self, start, end):
+        if start not in self.precomputed_distances or end not in self.precomputed_distances[start]:
+            distance = getDistance(start, end, self.distance_matrix, self.location_index_mapping)
+            self.precomputed_distances[start][end] = distance
+            self.precomputed_distances[end][start] = distance
+        return self.precomputed_distances[start][end]
+
+    def update_costs(self, start, end):
+        distance = self.get_distance(start, end)
+        self.total_distance += distance
+        self.total_cost += calculate_cost([start, end], self.current_vehicle, self.distance_matrix, self.location_index_mapping)
+        self.total_fuel_consumed += calculate_fuel_consumption(distance, self.current_vehicle, self.current_load)
+
+    def update_pheromone(self, pheromone_matrix, evaporation_rate, deposit_rate):
+        for i in range(len(self.route) - 1):
+            start_location = self.route[i]
+            end_location = self.route[i + 1]
+            start_idx = self.location_index_mapping[start_location]
+            end_idx = self.location_index_mapping[end_location]
+            pheromone_matrix[start_idx][end_idx] *= (1 - evaporation_rate)
+            pheromone_matrix[start_idx][end_idx] += deposit_rate / self.total_cost
 
 if __name__ == "__main__": 
-    df = locations_df
-    
+    df = locations_df   
+
+    # Run the base model
 
     # Separate the data into clusters
     clusters = [cluster for cluster in df['ClusterCode'].unique() if cluster != 'Core']
@@ -499,7 +611,7 @@ if __name__ == "__main__":
     
         cluster_df.to_csv(f"input/{itype}_{cluster}.csv", index=False)    
         locations_df = pd.read_csv(f"input/{itype}_{cluster}.csv")
-        output_folder = f"output/pso/{cluster}/{itype}"
+        output_folder = f"output/aco/{cluster}/{itype}"
         os.makedirs(output_folder, exist_ok=True)
         location_coords = generate_cordinates(locations_df)
         distance_matrix = generate_distanceMatrix(locations_df,location_coords)
@@ -507,7 +619,6 @@ if __name__ == "__main__":
 
         # Run the Base
         baseRun()
-
 
 
 
@@ -536,7 +647,7 @@ if __name__ == "__main__":
                 new_df.to_csv(f"input/{itype}.csv", index=False)
                 
 
-                output_folder = f"output/pso/{cluster}/{itype}"
+                output_folder = f"output/aco/{cluster}/{itype}"
                 os.makedirs(output_folder, exist_ok=True)
 
                 

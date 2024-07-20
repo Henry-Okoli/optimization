@@ -86,7 +86,7 @@ def calculate_fuel_consumption(distance, vehicle, current_load):
         (current_load / max_load) * fuel_max_load +
         (1 - current_load / max_load) * fuel_zero_load
     )
-    return  distance / fuel_consumption
+    return   distance / fuel_consumption
 
 def calculate_cost(route, vehicle, distance_matrix, location_index_mapping):
     """Calculates the total cost of a route, including fuel, wear and tear, and maintenance."""
