@@ -8,9 +8,10 @@ import matplotlib.pyplot as plt
 import os
 
 
-# Global variables for Greedy 
-NUM_SIMULATIONS = 3
-NUM_ITERATIONS = 5  
+# Global variables for ACO 
+NUM_SIMULATIONS = 3  
+NUM_ITERATIONS = 3
+NUM_ANTS = 2         
 PARTICLE_POPULATION = 5  
 PHEROMONE_EVAPORATION_RATE = 0.5 
 PHEROMONE_DEPOSIT_RATE = 1.0
@@ -27,7 +28,7 @@ locations_df = pd.read_csv(f"{itype}.csv")
 fleet_df = pd.read_csv("fleet_Data.csv")
 
 # Create an output folder if it doesn't exist
-output_folder = f"output/Greedy/{itype}"
+output_folder = f"output/aco/{itype}"
 # os.makedirs(output_folder, exist_ok=True)
 
 # Define function to calculate distance using haversine formula
@@ -85,7 +86,7 @@ def calculate_fuel_consumption(distance, vehicle, current_load):
         (current_load / max_load) * fuel_max_load +
         (1 - current_load / max_load) * fuel_zero_load
     )
-    return  distance / fuel_consumption
+    return   distance / fuel_consumption
 
 def calculate_cost(route, vehicle, distance_matrix, location_index_mapping):
     """Calculates the total cost of a route, including fuel, wear and tear, and maintenance."""
@@ -118,6 +119,49 @@ def calculate_cost(route, vehicle, distance_matrix, location_index_mapping):
 
     return total_cost
 
+def aco(start_location, end_locations, vehicles, distance_matrix, pheromone_matrix, simulation_folder, cluster, locations_df, alpha=1, beta=5, evaporation_rate=0.5, deposit_rate=1.0, num_ants=50, iterations=100):
+    best_route = None
+    best_cost = float('inf')
+    current_vehicle = None
+    best_distance = float('inf')
+    total_fuel_consumed = float('inf')
+
+    location_index_mapping = {code: idx for idx, code in enumerate(locations_df['code'])}
+
+    # Determine distribution centers based on start location
+    if start_location.startswith('M'):
+        distribution_centers = set()
+        distribution_centers.add(start_location)
+    elif start_location.startswith('W'):
+        distribution_centers = set()
+        distribution_centers.add(start_location)
+    else:
+        distribution_centers = set(locations_df[(locations_df['ClusterCode'] == cluster) & (locations_df['code'].str.startswith('D'))]['code'])
+
+    for _ in range(iterations):
+        print(f'    Iteration {_}')
+
+        ants = [Ant(start_location, end_locations, vehicles, distance_matrix, pheromone_matrix, alpha, beta, location_index_mapping, locations_df, distribution_centers) for _ in range(num_ants)]
+
+        for ant in ants:
+            ant.construct_route()
+
+            if ant.total_cost < best_cost:
+                best_cost = ant.total_cost
+                best_route = ant.route
+                best_distance = ant.total_distance
+                current_vehicle = ant.current_vehicle
+                total_fuel_consumed = ant.total_fuel_consumed
+
+        for ant in ants:
+            ant.update_pheromone(pheromone_matrix, evaporation_rate, deposit_rate)
+
+        # Save only the best ant's data for this iteration
+        iteration_pd = pd.DataFrame([[best_cost, best_distance, total_fuel_consumed, best_route]], 
+                                    columns=['total_cost', 'total_distance', 'total_fuel_consumed', 'route'])
+        iteration_pd.to_csv(os.path.join(simulation_folder, f'ants_iteration{_}.csv'), index=False)
+
+    return total_fuel_consumed, current_vehicle, best_distance, best_route, best_cost
 
 def choose_vehicle(start_location, end_locations, vehicles):
     """Chooses a suitable vehicle based on capacity, cluster, and start location."""
@@ -144,9 +188,9 @@ def run_simulations(start_location, end_locations, vehicles, distance_matrix, lo
     best_routes = {}
     best_costs = {}
 
-    print(f"Running {num_simulations} Greedy simulations for {cluster}")
-    best_routes["Greedy"] = []
-    best_costs["Greedy"] = []
+    print(f"Running {num_simulations} ACO simulations for {cluster}")
+    best_routes["ACO"] = []
+    best_costs["ACO"] = []
     best_details = []
 
     for sim in range(num_simulations):
@@ -156,13 +200,15 @@ def run_simulations(start_location, end_locations, vehicles, distance_matrix, lo
         
         pheromone_matrix = np.ones((len(locations_df), len(locations_df)))  # Set initial pheromone levels to 1
         
-        total_fuel_consumed, current_vehicle, best_distance, best_route, best_cost = greedy_algorithm(
-            start_location, end_locations, vehicles, distance_matrix, 
-            simulation_folder=output_folder, cluster=cluster, locations_df=locations_df
+        total_fuel_consumed, current_vehicle, best_distance, best_route, best_cost = aco(
+            start_location, end_locations, vehicles, distance_matrix, pheromone_matrix,
+            simulation_folder=output_folder, cluster=cluster, locations_df=locations_df,
+            evaporation_rate=PHEROMONE_EVAPORATION_RATE, deposit_rate=PHEROMONE_DEPOSIT_RATE,
+            num_ants=NUM_ANTS, iterations=NUM_ITERATIONS
         )
         
-        best_routes["Greedy"].append(best_route)
-        best_costs["Greedy"].append(best_cost)
+        best_routes["ACO"].append(best_route)
+        best_costs["ACO"].append(best_cost)
         
         best_details.append([f'Simulation_{sim}', best_distance, best_cost, total_fuel_consumed, best_route])
      
@@ -387,71 +433,11 @@ def baseRun():
     # Save to CSV
     df.to_csv(f'{output_folder}/summary.csv', index=False)   
 
-def greedy_algorithm(start_location, end_locations, vehicles, distance_matrix, simulation_folder, cluster, locations_df):
-    location_index_mapping = {code: idx for idx, code in enumerate(locations_df['code'])}
-    distribution_centers = set(locations_df[locations_df['code'].str.startswith('D')]['code'])
-    distribution_centers.add(start_location)
-
-    greedy_solver = GreedySolver(start_location, end_locations, vehicles, distance_matrix, location_index_mapping, locations_df, distribution_centers)
-    
-    best_route, best_cost = greedy_solver.solve()
-
-    # Save data for this iteration
-    iteration_pd = pd.DataFrame([[best_cost, best_route]], 
-                                columns=['total_cost', 'route'])
-    iteration_pd.to_csv(os.path.join(simulation_folder, f'greedy_result.csv'), index=False)
-
-    current_vehicle = choose_vehicle(start_location, end_locations, vehicles)
-    best_distance = sum(getDistance(best_route[i], best_route[i+1], distance_matrix, location_index_mapping) for i in range(len(best_route)-1))
-    total_fuel_consumed = sum(calculate_fuel_consumption(getDistance(best_route[i], best_route[i+1], distance_matrix, location_index_mapping), current_vehicle, current_vehicle['Capacity_KG']) for i in range(len(best_route)-1))
-
-    return total_fuel_consumed, current_vehicle, best_distance, best_route, best_cost
-
-class GreedySolver:
-    def __init__(self, start_location, end_locations, vehicles, distance_matrix, location_index_mapping, locations_df, distribution_centers):
-        self.start_location = start_location
-        self.end_locations = list(end_locations)
-        self.vehicles = vehicles
-        self.distance_matrix = distance_matrix
-        self.location_index_mapping = location_index_mapping
-        self.locations_df = locations_df
-        self.distribution_centers = distribution_centers
-        self.location_capacities = dict(zip(locations_df['code'], locations_df['Capacity_KG']))
-        self.current_vehicle = choose_vehicle(start_location, end_locations, vehicles)
-        self.current_load = self.current_vehicle['Capacity_KG']
-        self.location_demands = dict(zip(locations_df['code'], locations_df['Capacity_KG']))
-        self.unserviced_locations = set(end_locations)
-        self.start_type = start_location[0]
-        self.end_type = end_locations[0][0] if end_locations else None
-
-    def solve(self):
-        route = [self.start_location]
-        current_location = self.start_location
-        remaining_locations = self.end_locations.copy()
-
-        while remaining_locations:
-            next_location = self.find_nearest_location(current_location, remaining_locations)
-            route.append(next_location)
-            current_location = next_location
-            remaining_locations.remove(next_location)
-
-        cost = self.calculate_route_cost(route)
-        return route, cost
-
-    def find_nearest_location(self, current_location, locations):
-        return min(locations, key=lambda x: self.get_distance(current_location, x))
-
-    def get_distance(self, loc1, loc2):
-        return getDistance(loc1, loc2, self.distance_matrix, self.location_index_mapping)
-
-    def calculate_route_cost(self, route):
-        return calculate_cost(route, self.current_vehicle, self.distance_matrix, self.location_index_mapping)
-
-
 
 if __name__ == "__main__": 
-    df = locations_df
-    
+    df = locations_df   
+
+    # Run the base model
 
     # Separate the data into clusters
     clusters = [cluster for cluster in df['ClusterCode'].unique() if cluster != 'Core']
@@ -465,7 +451,7 @@ if __name__ == "__main__":
     
         cluster_df.to_csv(f"input/{itype}_{cluster}.csv", index=False)    
         locations_df = pd.read_csv(f"input/{itype}_{cluster}.csv")
-        output_folder = f"output/greedy/{cluster}/{itype}"
+        output_folder = f"output/aco/{cluster}/{itype}"
         os.makedirs(output_folder, exist_ok=True)
         location_coords = generate_cordinates(locations_df)
         distance_matrix = generate_distanceMatrix(locations_df,location_coords)
@@ -473,7 +459,6 @@ if __name__ == "__main__":
 
         # Run the Base
         baseRun()
-
 
 
 
@@ -502,7 +487,7 @@ if __name__ == "__main__":
                 new_df.to_csv(f"input/{itype}.csv", index=False)
                 
 
-                output_folder = f"output/greedy/{cluster}/{itype}"
+                output_folder = f"output/aco/{cluster}/{itype}"
                 os.makedirs(output_folder, exist_ok=True)
 
                 
