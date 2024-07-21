@@ -22,7 +22,7 @@ def greedy(start_location, end_locations, vehicles, distance_matrix, simulation_
                                 columns=['total_cost', 'route'])
     iteration_pd.to_csv(os.path.join(simulation_folder, f'greedy_result.csv'), index=False)
 
-    current_vehicle = choose_vehicle(start_location, end_locations, vehicles)
+    current_vehicle = choose_vehicle(start_location, end_locations, vehicles, locations_df)
     best_distance = sum(getDistance(best_route[i], best_route[i+1], distance_matrix, location_index_mapping) for i in range(len(best_route)-1))
     total_fuel_consumed = sum(calculate_fuel_consumption(getDistance(best_route[i], best_route[i+1], distance_matrix, location_index_mapping), current_vehicle, current_vehicle['Capacity_KG']) for i in range(len(best_route)-1))
 
@@ -38,7 +38,7 @@ class GreedySolver:
         self.locations_df = locations_df
         self.distribution_centers = distribution_centers
         self.location_capacities = dict(zip(locations_df['code'], locations_df['Capacity_KG']))
-        self.current_vehicle = choose_vehicle(start_location, end_locations, vehicles)
+        self.current_vehicle = choose_vehicle(start_location, end_locations, vehicles, locations_df)
         self.current_load = self.current_vehicle['Capacity_KG']
         self.location_demands = dict(zip(locations_df['code'], locations_df['Capacity_KG']))
         self.unserviced_locations = set(end_locations)
@@ -66,5 +66,5 @@ class GreedySolver:
         return getDistance(loc1, loc2, self.distance_matrix, self.location_index_mapping)
 
     def calculate_route_cost(self, route):
-        return calculate_cost(route, self.current_vehicle, self.distance_matrix, self.location_index_mapping)
+        return calculate_cost(route, self.current_vehicle, self.distance_matrix, self.location_index_mapping, self.locations_df)
 

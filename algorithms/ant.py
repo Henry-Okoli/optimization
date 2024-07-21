@@ -43,7 +43,7 @@ class Ant:
         self.start_type = start_location[0]  # 'M', 'W', or 'D'
         self.end_type = end_locations[0][0] if end_locations else None  # 'W', 'D', or 'R'
 
-    def construct_route(self, max_iterations=1000):
+    def construct_route(self, max_iterations=100):
         iterations = 0
         while self.unserviced_locations and iterations < max_iterations:
             iterations += 1

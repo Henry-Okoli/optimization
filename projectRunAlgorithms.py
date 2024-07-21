@@ -92,7 +92,7 @@ def run_simulations(algorithm , start_location, end_locations, vehicles, distanc
     return best_routes, best_costs
 
 def simulation(algorithm, item_type, source, start_location, end_locations_cluster1):
-    best_costs = 0
+    best_cost = 0
     if not end_locations_cluster1:
         return 0
     
@@ -123,17 +123,18 @@ def simulation(algorithm, item_type, source, start_location, end_locations_clust
         print(f'Algorithm -- {algorithm}')
         print(f"Best Cost for Cluster {cluster}: {min(best_costs[algorithm])}")
         print()
+        best_cost = min(best_costs[algorithm])
     
-    return best_costs
+    return best_cost
 
 def baseRun():
       
     
-    listofalgorithms = ['aco','pso','greedy']
+    listofalgorithms = ['pso'] # ,'aco','greedy'] 
 
     for algorithm in listofalgorithms:
         items = []
-        clusterList = locations_df['ClusterCode'].to_list()
+        clusterList = [cluster for cluster in locations_df['ClusterCode'].unique() if cluster != 'Core']
 
         for icluster in clusterList:
             output_folder = f"output/{algorithm}/{icluster}/{itype}"
@@ -165,27 +166,10 @@ def baseRun():
                     items.append({'algorithm':algorithm , 'source': start_location , 'destination' : 'Outlet' , 'Cluster': icluster , 'cost': best_cost})
 
             # Step 5: Let us output the best cost for the Clusters taking into consideration all the routes
-            cluster_costs = defaultdict(lambda: {'algorithm':algorithm , 'Warehouse': np.inf, 'Distribution': np.inf, 'Outlet': np.inf})
-            rows = []
-            print(cluster_costs)
-            for item in items:
-                cluster = item['Cluster']
-                destination = item['destination']
-                cost = item['cost']
-                if cost < cluster_costs[cluster][destination]:
-                    cluster_costs[cluster][destination] = cost
-
-            # Calculate the total cost for each cluster
-            for cluster, values in cluster_costs.items():
-                warehouse = values['Warehouse']
-                distribution = values['Distribution']
-                outlet = values['Outlet']
-                total = warehouse + distribution + outlet
-                rows.append([algorithm, cluster, warehouse, distribution, outlet, total])
-
+         
                 
             # Create DataFrame
-            df = pd.DataFrame(rows, columns=['Algorithm','Cluster', 'Warehouse Cost', 'Distribution Cost', 'Outlet Cost', 'Total Cost'])
+            df = pd.DataFrame(items, columns=['algorithm', 'source', 'destination','Cluster', 'Cost'])
 
             # Save to CSV
             df.to_csv(f'{output_folder}/summary.csv', index=False)   
@@ -194,55 +178,36 @@ def baseRun():
 if __name__ == "__main__": 
     df = locations_df   
 
-    # Separate the data into clusters
     clusters = [cluster for cluster in df['ClusterCode'].unique() if cluster != 'Core']
+
     for cluster in clusters:
-        cluster_df = df[df['ClusterCode'] == cluster]
-        # Ensure M1 is included in the new dataframe
-        if 'M1' not in cluster_df['code'].values:
-            m1_row = df[df['code'] == 'M1']
-            cluster_df = pd.concat([cluster_df, m1_row], ignore_index=True)  
-  
-    
-        cluster_df.to_csv(f"input/{itype}_{cluster}.csv", index=False)    
+        itype = '2W3DC'
         locations_df = pd.read_csv(f"input/{itype}_{cluster}.csv")
-    
         location_coords = generate_cordinates(locations_df)
         distance_matrix = generate_distanceMatrix(locations_df,location_coords)
         location_index_mapping = generate_index_mapping(locations_df)
-
-        # Run the Base
         baseRun()
 
-    # Process each cluster
-        cluster_df = df[df['ClusterCode'] == cluster]
-        
-        # Extract W and D codes
-        W_codes = cluster_df[cluster_df['code'].str.startswith('W')]['code'].tolist()
-        D_codes = cluster_df[cluster_df['code'].str.startswith('D')]['code'].tolist()
-        
-        # Generate combinations of 1 W and 1 D to eliminate
-        for w_code in W_codes:
-            for d_code in D_codes:
-                # Create a new dataframe excluding the selected W and D codes
-                new_df = cluster_df[~cluster_df['code'].isin([w_code, d_code])]
+    segments = ['1W2DC']
+    for segment in segments:
+        # Separate the data into clusters
+        for cluster in clusters:
+            cluster_df = df[df['ClusterCode'] == cluster]
 
-                # Ensure M1 is included in the new dataframe
-                if 'M1' not in new_df['code'].values:
-                    m1_row = df[df['code'] == 'M1']
-                    new_df = pd.concat([new_df, m1_row], ignore_index=True)
-                
-                # Save the new dataframe to a CSV file
-                os.makedirs('input', exist_ok=True)
-                itype = f'1W2DC - {w_code} and {d_code}'
-                new_df.to_csv(f"input/{itype}.csv", index=False)
-                        
-                # Simulate for each new Data Frame
-                locations_df = pd.read_csv(f"input/{itype}.csv")
-                location_coords = generate_cordinates(locations_df)
-                distance_matrix = generate_distanceMatrix(locations_df,location_coords)
-                location_index_mapping = generate_index_mapping(locations_df)
-
-                baseRun()
+            # Extract W and D codes
+            W_codes = cluster_df[cluster_df['code'].str.startswith('W')]['code'].tolist()
+            D_codes = cluster_df[cluster_df['code'].str.startswith('D')]['code'].tolist()
+            
+            # Generate combinations of 1 W and 1 D to eliminate
+            for w_code in W_codes:
+                for d_code in D_codes:           
+                    # Simulate for each new Data Frame
+                    itype = f'{segment} - {w_code} and {d_code}'
+                    locations_df = pd.read_csv(f"input/{itype}.csv")
+                    location_coords = generate_cordinates(locations_df)
+                    distance_matrix = generate_distanceMatrix(locations_df,location_coords)
+                    location_index_mapping = generate_index_mapping(locations_df)
+                    print(itype)
+                    baseRun()
 
         
