@@ -10,13 +10,8 @@ from algorithms.pso import pso
 from algorithms.greedy import greedy
 
 
-# Global variables for ACO 
+# Global variables
 NUM_SIMULATIONS = 3  
-
-
-
-
-# Global variables for PSO 
 
 
 # My Variables
@@ -130,7 +125,7 @@ def simulation(algorithm, item_type, source, start_location, end_locations_clust
 def baseRun():
       
     
-    listofalgorithms = ['pso'] # ,'aco','greedy'] 
+    listofalgorithms = ['greedy','aco','pso'] 
 
     for algorithm in listofalgorithms:
         items = []
@@ -143,7 +138,7 @@ def baseRun():
             # Step 1:   We Get the Cost of Supplying the Warehouses from the Purchase Center.  We start from the Purchase Center (M) and then travel to all the Warehouses in a Specific Cluster and supply them 
             start_location = 'M1'  # Core (M1)
             warehouses_cluster = locations_df[(locations_df['ClusterCode'] == icluster) & (locations_df['code'].str.startswith('W'))]['code'].tolist()
-            
+            print (warehouses_cluster)
             best_cost = simulation(algorithm,'PC_Warehouse',icluster, start_location,  warehouses_cluster)
             items.append({'algorithm':algorithm , 'source': start_location , 'destination' : 'Warehouse' , 'Cluster': icluster , 'cost': best_cost})
               
@@ -152,7 +147,7 @@ def baseRun():
             distributions_cluster = locations_df[(locations_df['ClusterCode'] == icluster) & (locations_df['code'].str.startswith('D'))]['code'].tolist()
        
             for Wh in warehouses_cluster:
-                start_location = Wh  # Go from the Warhouses
+                start_location = Wh  # Go from the Warehouses
                 best_cost = simulation(algorithm,'Warehouse_Distribution',icluster,start_location, distributions_cluster)
                 items.append({'algorithm':algorithm , 'source': start_location , 'destination' : 'Distribution' , 'Cluster': icluster , 'cost': best_cost})
 
@@ -169,10 +164,10 @@ def baseRun():
          
                 
             # Create DataFrame
-            df = pd.DataFrame(items, columns=['algorithm', 'source', 'destination','Cluster', 'Cost'])
+            # df = pd.DataFrame(items, columns=['algorithm', 'source', 'destination','Cluster', 'Cost'])
 
             # Save to CSV
-            df.to_csv(f'{output_folder}/summary.csv', index=False)   
+            # df.to_csv(f'{output_folder}/summary.csv', index=False)   
 
 
 if __name__ == "__main__": 

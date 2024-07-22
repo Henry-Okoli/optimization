@@ -45,14 +45,16 @@ class Ant:
 
     def construct_route(self, max_iterations=100):
         iterations = 0
+
         while self.unserviced_locations and iterations < max_iterations:
             iterations += 1
             
             if iterations % 100 == 0:
                 print(f"Iteration {iterations}: Current location {self.current_location}, Remaining locations: {self.unserviced_locations}")
 
+        
             if self.start_type == 'M' and self.current_location == self.start_location:
-                next_location = self.force_end_location_visit()
+                next_location = self.select_next_location()  # self.force_end_location_visit()
             else:
                 next_location = self.select_next_location()
 
@@ -60,13 +62,14 @@ class Ant:
                 print(f"No valid next location found. Breaking loop.")
                 break
 
+            
             if next_location in self.distribution_centers:
                 self.route.append(next_location)
                 self.current_load = self.current_vehicle['Capacity_KG']
                 print(f"Restocked at DC {next_location}. Current load: {self.current_load}")
             else:
                 required_load = self.location_demands[next_location]
-                
+
                 if self.current_load >= required_load:
                     self.route.append(next_location)
                     self.current_load -= required_load
@@ -116,7 +119,6 @@ class Ant:
             return min(self.end_locations, key=lambda loc: self.get_distance(self.current_location, loc))
         return self.find_nearest_dc()
 
-    
     def calculate_probabilities(self):
         probabilities = {}
         total_probability = 0
@@ -152,8 +154,12 @@ class Ant:
         
         return {k: v / total_probability for k, v in probabilities.items()}
 
+    
     def find_nearest_dc(self):
-        return min(self.distribution_centers, key=lambda dc: self.get_distance(self.current_location, dc))
+        print(self.distribution_centers)
+        print('Here')
+        return min((dc for dc in self.distribution_centers if dc != self.current_location), 
+                   key=lambda dc: self.get_distance(self.current_location, dc))
 
     def get_distance(self, start, end):
         if start not in self.precomputed_distances or end not in self.precomputed_distances[start]:

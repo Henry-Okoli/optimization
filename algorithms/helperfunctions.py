@@ -42,8 +42,6 @@ def generate_distanceMatrix(location_data, coords):
     return dmatrix
 
 
-
-
 # Define function to calculate distance using haversine formula
 def calculate_distance(coord1, coord2):
     return haversine(coord1, coord2, unit=Unit.KILOMETERS)
