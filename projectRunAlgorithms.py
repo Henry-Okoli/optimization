@@ -10,13 +10,8 @@ from algorithms.pso import pso
 from algorithms.greedy import greedy
 
 
-# Global variables for ACO 
+# Global variables
 NUM_SIMULATIONS = 3  
-
-
-
-
-# Global variables for PSO 
 
 
 # My Variables
@@ -130,7 +125,7 @@ def simulation(algorithm, item_type, source, start_location, end_locations_clust
 def baseRun():
       
     
-    listofalgorithms = ['pso'] # ,'aco','greedy'] 
+    listofalgorithms = ['aco'] # 'greedy','aco','pso'] 
 
     for algorithm in listofalgorithms:
         items = []
@@ -152,7 +147,7 @@ def baseRun():
             distributions_cluster = locations_df[(locations_df['ClusterCode'] == icluster) & (locations_df['code'].str.startswith('D'))]['code'].tolist()
        
             for Wh in warehouses_cluster:
-                start_location = Wh  # Go from the Warhouses
+                start_location = Wh  # Go from the Warehouses
                 best_cost = simulation(algorithm,'Warehouse_Distribution',icluster,start_location, distributions_cluster)
                 items.append({'algorithm':algorithm , 'source': start_location , 'destination' : 'Distribution' , 'Cluster': icluster , 'cost': best_cost})
 

@@ -88,8 +88,8 @@ def save_route_data(route, vehicle, distance_matrix, simulation_folder, cluster,
             end_location, 
             distance, 
             current_load,  # Load at Start
-            new_load,  # Load at End
             discharged_restocked,  # Discharged/Restocked
+            new_load,  # Load at End
             fuel_consumption, 
             wear_tear_cost
         ])
@@ -103,7 +103,7 @@ def save_route_data(route, vehicle, distance_matrix, simulation_folder, cluster,
     # Create a Pandas DataFrame from the route data
     route_df = pd.DataFrame(route_data, columns=[
         'Cycle', 'Vehicle Type', 'Start Location', 'End Location', 'Distance', 
-        'Load at Start', 'Load at End', 'Discharged/Restocked', 
+        'Load at Start', 'Discharged/Restocked',  'Load at End', 
         'Fuel Consumed', 'Wear and Tear Cost'
     ])
 
