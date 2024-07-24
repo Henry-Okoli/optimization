@@ -6,7 +6,6 @@ from collections import defaultdict
 from .helperfunctions  import choose_vehicle , getDistance
 from .costfunctions import calculate_cost, calculate_fuel_consumption
 
-
 #default 
 
 NUM_ANTS = 2         
@@ -43,13 +42,13 @@ class Ant:
         self.start_type = start_location[0]  # 'M', 'W', or 'D'
         self.end_type = end_locations[0][0] if end_locations else None  # 'W', 'D', or 'R'
 
-    def construct_route(self, max_iterations=100):
+    def construct_route(self, max_iterations=10):
         iterations = 0
 
         while self.unserviced_locations and iterations < max_iterations:
             iterations += 1
             
-            if iterations % 100 == 0:
+            if iterations % max_iterations == 0:
                 print(f"Iteration {iterations}: Current location {self.current_location}, Remaining locations: {self.unserviced_locations}")
 
         
