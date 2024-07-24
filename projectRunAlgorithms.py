@@ -39,7 +39,7 @@ def route_to_indices(route, location_index_mapping):
 def indices_to_route(indices, index_location_mapping):
     return [index_location_mapping[idx] for idx in indices]
 
-def run_simulations(algorithm , start_location, end_locations, vehicles, distance_matrix, location_index_mapping, simulation_folder, cluster, locations_df, num_simulations=10):
+def run_simulations(algorithm, item_type , start_location, end_locations, vehicles, distance_matrix, location_index_mapping, simulation_folder, cluster, locations_df, num_simulations=10):
     best_routes = {'best_routes':['a','b']}
     best_costs = {'best_costs':[100,200,300]}
 
@@ -78,8 +78,8 @@ def run_simulations(algorithm , start_location, end_locations, vehicles, distanc
         
         best_details.append([f'Simulation_{sim}', best_distance, best_cost, total_fuel_consumed, best_route])
      
-        visualize_route(best_route, current_vehicle, distance_matrix, output_folder, cluster,location_coords, locations_df)
-        save_route_data(best_route, current_vehicle, distance_matrix, output_folder, cluster, location_index_mapping,locations_df, cycle_num=1)
+        visualize_route(item_type, best_route, current_vehicle, distance_matrix, output_folder, cluster,location_coords, locations_df)
+        save_route_data(item_type, best_route, current_vehicle, distance_matrix, output_folder, cluster, location_index_mapping,locations_df, cycle_num=1)
 
     simulation_df = pd.DataFrame(best_details, columns=['Simulation', 'Distance Traveled', 'Cost Incurred', 'Fuel Consumed', 'Best Route'])
     simulation_df.to_csv(os.path.join(simulation_folder, f"simulation_data_{cluster}.csv"), index=False)
@@ -100,7 +100,7 @@ def simulation(algorithm, item_type, source, start_location, end_locations_clust
         else:
             vehicles = fleet_df[fleet_df['Cluster'] == cluster.replace(' ', '_')]
 
-        best_routes, best_costs = run_simulations(algorithm,
+        best_routes, best_costs = run_simulations(algorithm,item_type,
             start_location, end_locations, vehicles, distance_matrix,
             location_index_mapping, simulation_folder, cluster, locations_df,
             num_simulations=NUM_SIMULATIONS
@@ -112,8 +112,8 @@ def simulation(algorithm, item_type, source, start_location, end_locations_clust
 
         best_route = best_routes[algorithm][np.argmin(best_costs[algorithm])]
 
-        visualize_route(best_route, choose_vehicle(start_location , end_locations, vehicles, locations_df), distance_matrix, simulation_folder, cluster,location_coords, locations_df)
-        save_route_data(best_route, choose_vehicle(start_location ,end_locations, vehicles, locations_df), distance_matrix, simulation_folder, cluster, location_index_mapping,  locations_df, cycle_num=1)
+        visualize_route(item_type, best_route, choose_vehicle(start_location , end_locations, vehicles, locations_df), distance_matrix, simulation_folder, cluster,location_coords, locations_df)
+        save_route_data(item_type, best_route, choose_vehicle(start_location ,end_locations, vehicles, locations_df), distance_matrix, simulation_folder, cluster, location_index_mapping,  locations_df, cycle_num=1)
 
         print(f'Algorithm -- {algorithm}')
         print(f"Best Cost for Cluster {cluster}: {min(best_costs[algorithm])}")
@@ -125,7 +125,7 @@ def simulation(algorithm, item_type, source, start_location, end_locations_clust
 def baseRun():
       
     
-    listofalgorithms = ['greedy','aco','pso'] 
+    listofalgorithms = ['pso', 'greedy','aco' ]  # 
 
     for algorithm in listofalgorithms:
         items = []

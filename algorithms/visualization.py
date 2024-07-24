@@ -5,7 +5,7 @@ import os
 import matplotlib.pyplot as plt
 
 
-def visualize_route(route, vehicle, distance_matrix, simulation_folder, cluster,location_coords, locations_df):
+def visualize_route(triptype , route, vehicle, distance_matrix, simulation_folder, cluster,location_coords, locations_df):
     """Visualizes the optimized route and saves it as a PNG image."""
     # Extract coordinates of locations in the route
     route_coords = [location_coords[location] for location in route]
@@ -40,7 +40,7 @@ def visualize_route(route, vehicle, distance_matrix, simulation_folder, cluster,
     plt.savefig(os.path.join(simulation_folder, f"route_visualization.png"))
     plt.close()
 
-def save_route_data(route, vehicle, distance_matrix, simulation_folder, cluster, location_index_mapping, locations_df, cycle_num):
+def save_route_data(triptype , route, vehicle, distance_matrix, simulation_folder, cluster, location_index_mapping, locations_df, cycle_num):
     """Saves the route data to a CSV file in the simulation folder."""
     route_data = []
     current_load = vehicle.Capacity_KG
@@ -72,7 +72,8 @@ def save_route_data(route, vehicle, distance_matrix, simulation_folder, cluster,
         location_capacity = locations_df['Capacity_KG'][end_location_index]
 
         # Determine if location is for discharge or restock
-        if end_location.startswith('D') or end_location.startswith('W'):
+    
+        if (triptype == 'Distribution_RetailOutlet' and end_location.startswith('D') ) or (triptype == 'Warehouse_Distribution' and end_location.startswith('W') ) or (triptype == 'PC_Warehouse' and end_location.startswith('M') ):
             # This is a distribution center or warehouse, so we restock
             discharged_restocked = vehicle.Capacity_KG - current_load
             new_load = vehicle.Capacity_KG
