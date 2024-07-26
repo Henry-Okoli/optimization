@@ -125,7 +125,7 @@ def simulation(algorithm, item_type, source, start_location, end_locations_clust
 def baseRun():
       
     
-    listofalgorithms = ['pso', 'greedy','aco' ]  # 
+    listofalgorithms = ['aco' ]  # 'pso', 'greedy',
 
     for algorithm in listofalgorithms:
         items = []
