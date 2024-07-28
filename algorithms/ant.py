@@ -156,7 +156,6 @@ class Ant:
     
     def find_nearest_dc(self):
         print(self.distribution_centers)
-        print('Here')
         return min((dc for dc in self.distribution_centers if dc != self.current_location), 
                    key=lambda dc: self.get_distance(self.current_location, dc))
 
@@ -195,14 +194,8 @@ def aco(start_location, end_locations, vehicles, distance_matrix, pheromone_matr
     location_index_mapping = {code: idx for idx, code in enumerate(locations_df['code'])}
 
     # Determine distribution centers based on start location
-    if start_location.startswith('M'):
-        distribution_centers = set()
-        distribution_centers.add(start_location)
-    elif start_location.startswith('W'):
-        distribution_centers = set()
-        distribution_centers.add(start_location)
-    else:
-        distribution_centers = set(locations_df[(locations_df['ClusterCode'] == cluster) & (locations_df['code'].str.startswith('D'))]['code'])
+    
+    distribution_centers = set(locations_df[(locations_df['ClusterCode'] == cluster) & (locations_df['code'].str.startswith(start_location[0]))]['code'])
 
     for _ in range(iterations):
         print(f'    Iteration {_}')

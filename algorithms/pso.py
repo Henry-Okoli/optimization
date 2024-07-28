@@ -188,13 +188,8 @@ class Particle:
 def pso(start_location, end_locations, vehicles, distance_matrix, simulation_folder, cluster, locations_df, num_particles=PARTICLE_POPULATION, iterations=NUM_ITERATIONS):
     location_index_mapping = {code: idx for idx, code in enumerate(locations_df['code'])}
     
-    if start_location.startswith('M'):
-        distribution_centers = {start_location}
-    elif start_location.startswith('W'):
-        distribution_centers = {start_location}
-    else:
-        distribution_centers = set(locations_df[(locations_df['ClusterCode'] == cluster) & (locations_df['code'].str.startswith('D'))]['code'])
-
+    distribution_centers = set(locations_df[(locations_df['ClusterCode'] == cluster) & (locations_df['code'].str.startswith(start_location[0]))]['code'])
+    
     # Check if all locations can be served given the vehicle capacity
     max_demand = max(locations_df['Capacity_KG'])
   #  if max_demand > max(vehicle['Capacity_KG'] for vehicle in vehicles):
