@@ -9,7 +9,7 @@ def choose_vehicle(start_location, end_locations, vehicles, locations_df):
     """Chooses a suitable vehicle based on capacity, cluster, and start location."""
     total_capacity_needed = sum(locations_df[locations_df['code'].isin(end_locations)]['Capacity_KG'])
     
-    if start_location.startswith('M') or start_location.startswith('W'):
+    if start_location.startswith('M') or start_location.startswith('W')  or start_location.startswith('S'):
         cluster_vehicles = vehicles[vehicles['Cluster'] == 'Core']
     else:
         # Identify the cluster of the end locations
