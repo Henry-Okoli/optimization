@@ -82,7 +82,7 @@ def run_simulations(algorithm, item_type , start_location, end_locations, vehicl
         save_route_data(item_type, best_route, current_vehicle, distance_matrix, output_folder, cluster, location_index_mapping,locations_df, cycle_num=1)
 
     simulation_df = pd.DataFrame(best_details, columns=['Simulation', 'Distance Traveled', 'Cost Incurred', 'Fuel Consumed', 'Best Route'])
-    simulation_df.to_csv(os.path.join(simulation_folder, f"simulation_data_{cluster}.csv"), index=False)
+    simulation_df.to_csv(os.path.join(simulation_folder, f"simulation_data_{item_type}_{cluster}.csv"), index=False)
 
     return best_routes, best_costs
 
@@ -99,12 +99,13 @@ def simulation(algorithm, item_type, source, start_location, end_locations_clust
             vehicles = fleet_df[fleet_df['Cluster'] == 'Core']
         else:
             vehicles = fleet_df[fleet_df['Cluster'] == cluster.replace(' ', '_')]
-
+        
+        print(end_locations)
         best_routes, best_costs = run_simulations(algorithm,item_type,
-            start_location, end_locations, vehicles, distance_matrix,
-            location_index_mapping, simulation_folder, cluster, locations_df,
-            num_simulations=NUM_SIMULATIONS
-        )
+                start_location, end_locations, vehicles, distance_matrix,
+                location_index_mapping, simulation_folder, cluster, locations_df,
+                num_simulations=NUM_SIMULATIONS
+            )
         
         
         print(best_costs)
@@ -135,7 +136,7 @@ def baseRun():
             output_folder = f"output/{algorithm}/{icluster}/{itype}"
             os.makedirs(output_folder, exist_ok=True)
 
-            manufacture_cluster = locations_df[(locations_df['ClusterCode'] == icluster) & (locations_df['code'].str.startswith('S'))]['code'].tolist()
+            manufacture_cluster = locations_df[(locations_df['ClusterCode'] == icluster) & (locations_df['code'].str.startswith('M'))]['code'].tolist()
             slaughterwarehouses_cluster = locations_df[(locations_df['ClusterCode'] == icluster) & (locations_df['code'].str.startswith('S'))]['code'].tolist()
             warehouses_cluster = locations_df[(locations_df['ClusterCode'] == icluster) & (locations_df['code'].str.startswith('W'))]['code'].tolist()
             distributions_cluster = locations_df[(locations_df['ClusterCode'] == icluster) & (locations_df['code'].str.startswith('D'))]['code'].tolist()
@@ -190,6 +191,5 @@ if __name__ == "__main__":
     distance_matrix = generate_distanceMatrix(locations_df,location_coords)
     location_index_mapping = generate_index_mapping(locations_df)
     baseRun()
-
 
         

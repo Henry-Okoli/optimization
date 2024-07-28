@@ -97,8 +97,8 @@ class GreedySolver:
 
 def greedy(start_location, end_locations, vehicles, distance_matrix, simulation_folder, cluster, locations_df):
     location_index_mapping = {code: idx for idx, code in enumerate(locations_df['code'])}
-    distribution_centers = set(locations_df[locations_df['code'].str.startswith('D')]['code'])
-    distribution_centers.add(start_location)
+    distribution_centers = set(locations_df[(locations_df['ClusterCode'] == cluster) & (locations_df['code'].str.startswith(start_location[0]))]['code'])
+    
 
     greedy_solver = GreedySolver(start_location, end_locations, vehicles, distance_matrix, location_index_mapping, locations_df, distribution_centers)
     
