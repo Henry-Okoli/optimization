@@ -8,10 +8,10 @@ from .costfunctions import calculate_cost, calculate_fuel_consumption
 
 #default 
 
-NUM_ANTS = 2         
+NUM_ANTS = 5         
 PHEROMONE_EVAPORATION_RATE = 0.5 
 PHEROMONE_DEPOSIT_RATE = 1.0
-NUM_ITERATIONS = 3
+NUM_ITERATIONS = 30
 ALPHA = 1
 BETA = 5, 
 
@@ -26,6 +26,7 @@ class Ant:
         self.alpha = alpha
         self.beta = beta
         self.route = [start_location]
+        self.route_matrix= []
         self.total_cost = 0
         self.total_distance = 0
         self.total_fuel_consumed = 0
@@ -51,53 +52,59 @@ class Ant:
             if iterations % max_iterations == 0:
                 print(f"Iteration {iterations}: Current location {self.current_location}, Remaining locations: {self.unserviced_locations}")
 
-        
-            if self.start_type == 'M' and self.current_location == self.start_location:
-                next_location = self.select_next_location()  # self.force_end_location_visit()
-            else:
-                next_location = self.select_next_location()
+            next_location = self.select_next_location()
+            print(next_location)
+            
+            vehicle_current_load = self.current_load # Allows us to log the current load
 
             if next_location is None:
                 print(f"No valid next location found. Breaking loop.")
                 break
-
-            
-            if next_location in self.distribution_centers:
+            # print(self.location_demands)
+            required_load = self.location_demands[next_location]
+            print(f"Selected Location {next_location}. Remaining load: {self.current_load}. Location Load {required_load}. unserviced locations: {self.unserviced_locations}")
+            if self.current_load >= required_load:
                 self.route.append(next_location)
-                self.current_load = self.current_vehicle['Capacity_KG']
-                print(f"Restocked at DC {next_location}. Current load: {self.current_load}")
+                self.current_load -= required_load
+                self.unserviced_locations.remove(next_location)
+                print(f"Serviced {next_location}. Remaining load: {self.current_load}")
             else:
-                required_load = self.location_demands[next_location]
+                nearest_dc = self.find_nearest_dc()
+                if nearest_dc == self.current_location:
+                    print(f"Already at nearest DC {nearest_dc}. Breaking loop to avoid infinite restocking.")
+                    break
 
-                if self.current_load >= required_load:
-                    self.route.append(next_location)
-                    self.current_load -= required_load
-                    self.unserviced_locations.remove(next_location)
-                    print(f"Serviced {next_location}. Remaining load: {self.current_load}")
+                if nearest_dc == None:
+                    # There is no DC that would be able to refill. this should not be possible, except all the dc cannot supply the route
+                    print("No more DCs that can supply volumes")
+                    break
+
+                if self.route[-1].startswith(nearest_dc[0]):
+                    self.force_unserviced_location_visit()
                 else:
-                    nearest_dc = self.find_nearest_dc()
-                    if nearest_dc == self.current_location:
-                        print(f"Already at nearest DC {nearest_dc}. Breaking loop to avoid infinite restocking.")
-                        break
+                    dc_load = self.location_demands[nearest_dc]
+                    
+                    self.location_demands[nearest_dc] -= dc_load - self.current_vehicle['Capacity_KG']
                     self.route.append(nearest_dc)
-                    self.current_load = self.current_vehicle['Capacity_KG']
-                    print(f"Insufficient load. Restocked at nearest DC {nearest_dc}")
+                    self.current_load = dc_load -self.current_vehicle['Capacity_KG']
+                    print(f"Insufficient load. Restocked at nearest DC {nearest_dc} and {self.current_load} with {dc_load}")
             
             self.update_costs(self.route[-2], self.route[-1])
+            print(self.route , self.current_location , self.route[-1])
             self.current_location = self.route[-1]
+
+            self.route_matrix.append([self.route[-2], self.route[-1],vehicle_current_load , self.current_vehicle['Capacity_KG'] - vehicle_current_load])
+            
 
             # Check if we're stuck in a loop
             if len(self.route) > 3 and len(set(self.route[-3:])) == 2:
                 print("Detected a potential loop. Forcing a jump to an unserviced location.")
-                if self.unserviced_locations:
-                    forced_location = random.choice(list(self.unserviced_locations))
-                    self.route.append(forced_location)
-                    self.current_location = forced_location
-                    self.current_load = max(0, self.current_load - self.location_demands[forced_location])
-                    self.unserviced_locations.remove(forced_location)
+                self.force_unserviced_location_visit()
+
 
         if iterations == max_iterations:
             print(f"Warning: Maximum iterations ({max_iterations}) reached. Route may be incomplete.")
+
         print(f"Route construction completed in {iterations} iterations.")
         print(f"Final route: {self.route}")
         print(f"Remaining unserviced locations: {self.unserviced_locations}")
@@ -106,7 +113,7 @@ class Ant:
         probabilities = self.calculate_probabilities()
         if not probabilities:
             # If no valid probabilities, try to find any unserviced location or distribution center
-            available_locations = list(self.unserviced_locations) + list(self.distribution_centers)
+            available_locations = list(self.unserviced_locations) # + list(self.distribution_centers)
             if available_locations:
                 return random.choice(available_locations)
             else:
@@ -122,7 +129,7 @@ class Ant:
         probabilities = {}
         total_probability = 0
         
-        for location in self.unserviced_locations | self.distribution_centers:
+        for location in self.unserviced_locations: # | self.distribution_centers:
             if location == self.current_location:
                 continue
             
@@ -133,18 +140,18 @@ class Ant:
             pheromone = self.pheromone_matrix[self.location_index_mapping[self.current_location]][self.location_index_mapping[location]]
             probability = pheromone**self.alpha * (1/distance)**self.beta
             
-            if location in self.unserviced_locations:
-                required_load = self.location_demands[location]
-                if self.current_load >= required_load:
-                    probability *= 3.0  # Strongly favor serviceable locations
-                else:
-                    probability *= 0.5  # Reduce probability for locations we can't fully service
-            elif location in self.distribution_centers:
-                if self.current_load < 0.2 * self.current_vehicle['Capacity_KG']:
-                    probability *= 2.0  # Favor distribution centers when load is low
-                elif self.start_type in ['M', 'W'] and self.end_type in ['W', 'D']:
-                    probability *= 1.5  # Slightly favor distribution centers for M->W and W->D routes
-            
+            """           if location in self.unserviced_locations:
+                            required_load = self.location_demands[location]
+                            if self.current_load >= required_load:
+                                probability *= 3.0  # Strongly favor serviceable locations
+                            else:
+                                probability *= 0.5  # Reduce probability for locations we can't fully service
+                        elif location in self.distribution_centers:
+                            if self.current_load < 0.2 * self.current_vehicle['Capacity_KG']:
+                                probability *= 2.0  # Favor distribution centers when load is low
+                            elif self.start_type in ['M', 'W'] and self.end_type in ['W', 'D']:
+                                probability *= 1.5  # Slightly favor distribution centers for M->W and W->D routes
+                        """
             probabilities[location] = probability
             total_probability += probability
 
@@ -153,11 +160,27 @@ class Ant:
         
         return {k: v / total_probability for k, v in probabilities.items()}
 
+    def force_unserviced_location_visit(self):
+        if self.unserviced_locations:
+            forced_location = random.choice(list(self.unserviced_locations))
+            self.route.append(forced_location)
+            self.current_location = forced_location
+            self.current_load = max(0, self.current_load - self.location_demands[forced_location])
+            self.unserviced_locations.remove(forced_location)
+
     
     def find_nearest_dc(self):
-        print(self.distribution_centers)
-        return min((dc for dc in self.distribution_centers if dc != self.current_location), 
-                   key=lambda dc: self.get_distance(self.current_location, dc))
+        feasible_dcs = [
+                            dc for dc in self.distribution_centers
+                            if dc != self.current_location and
+                                self.location_demands[dc]  > 0
+                            ]
+
+        if not feasible_dcs:
+            # Handle case where no feasible DC found
+            return None
+
+        return min(feasible_dcs, key=lambda dc: self.get_distance(self.current_location, dc))
 
     def get_distance(self, start, end):
         if start not in self.precomputed_distances or end not in self.precomputed_distances[start]:
@@ -183,13 +206,14 @@ class Ant:
 
 
 
-def aco(start_location, end_locations, vehicles, distance_matrix, pheromone_matrix, simulation_folder, cluster, locations_df, alpha=ALPHA, beta= BETA, evaporation_rate=PHEROMONE_EVAPORATION_RATE, deposit_rate=PHEROMONE_DEPOSIT_RATE, num_ants=NUM_ANTS, iterations=100
+def aco(start_location, end_locations, vehicles, distance_matrix, pheromone_matrix, simulation_folder, cluster, locations_df, alpha=ALPHA, beta= BETA, evaporation_rate=PHEROMONE_EVAPORATION_RATE, deposit_rate=PHEROMONE_DEPOSIT_RATE, num_ants=NUM_ANTS, iterations=NUM_ITERATIONS
 ):
     best_route = None
     best_cost = float('inf')
     current_vehicle = None
     best_distance = float('inf')
     total_fuel_consumed = float('inf')
+    route_matrix = None
 
     location_index_mapping = {code: idx for idx, code in enumerate(locations_df['code'])}
 
@@ -211,13 +235,14 @@ def aco(start_location, end_locations, vehicles, distance_matrix, pheromone_matr
                 best_distance = ant.total_distance
                 current_vehicle = ant.current_vehicle
                 total_fuel_consumed = ant.total_fuel_consumed
+                route_matrix = ant.route_matrix
 
         for ant in ants:
             ant.update_pheromone(pheromone_matrix, evaporation_rate, deposit_rate)
 
         # Save only the best ant's data for this iteration
-        iteration_pd = pd.DataFrame([[best_cost, best_distance, total_fuel_consumed, best_route]], 
-                                    columns=['total_cost', 'total_distance', 'total_fuel_consumed', 'route'])
+        iteration_pd = pd.DataFrame([[best_cost, best_distance, total_fuel_consumed, best_route,route_matrix]], 
+                                    columns=['total_cost', 'total_distance', 'total_fuel_consumed', 'route', 'route_matrix'])
         iteration_pd.to_csv(os.path.join(simulation_folder, f'ants_iteration{_}.csv'), index=False)
 
     return total_fuel_consumed, current_vehicle, best_distance, best_route, best_cost

@@ -40,8 +40,8 @@ def indices_to_route(indices, index_location_mapping):
     return [index_location_mapping[idx] for idx in indices]
 
 def run_simulations(algorithm, item_type , start_location, end_locations, vehicles, distance_matrix, location_index_mapping, simulation_folder, cluster, locations_df, num_simulations=10):
-    best_routes = {'best_routes':['a','b']}
-    best_costs = {'best_costs':[100,200,300]}
+    best_routes = {}
+    best_costs = {}
 
     print(f"Running {num_simulations} {algorithm} simulations for {cluster}")
     best_routes[algorithm] = []
@@ -144,16 +144,16 @@ def baseRun():
             # Step 0:   We Get the Cost of Supplying the Abatories from the Purchase Center.  We start from the Purchase Center (M) and then travel to all the Warehouses in a Specific Cluster and supply them 
             for manufacture in manufacture_cluster:
                 start_location = manufacture  
-                best_cost = simulation(algorithm,'PC_SlaughterHouse',icluster, start_location,  slaughterwarehouses_cluster)
-                items.append({'algorithm':algorithm , 'source': start_location , 'destination' : 'Slaughterhouse' , 'Cluster': icluster , 'cost': best_cost})
+                best_cost = simulation(algorithm,'PC_Warehouse',icluster, start_location,  warehouses_cluster)
+                items.append({'algorithm':algorithm , 'source': start_location , 'destination' : 'Warehouse' , 'Cluster': icluster , 'cost': best_cost})
                 
 
             # Step 1:   We Get the Cost of Supplying the Warehouses from the Purchase Center.  We start from the Purchase Center (M) and then travel to all the Warehouses in a Specific Cluster and supply them 
             
-            for slaughterhouse in slaughterwarehouses_cluster:
-                start_location = slaughterhouse  # 
-                best_cost = simulation(algorithm,'Slaughterhouse_Warehouse',icluster, start_location,  warehouses_cluster)
-                items.append({'algorithm':algorithm , 'source': start_location , 'destination' : 'Warehouse' , 'Cluster': icluster , 'cost': best_cost})
+           # for slaughterhouse in slaughterwarehouses_cluster:
+           #     start_location = slaughterhouse  # 
+           #     best_cost = simulation(algorithm,'Slaughterhouse_Warehouse',icluster, start_location,  warehouses_cluster)
+           #     items.append({'algorithm':algorithm , 'source': start_location , 'destination' : 'Warehouse' , 'Cluster': icluster , 'cost': best_cost})
               
             # Step 2: We get the Best Cost of Supplying all the Distribution Centers form the Warehouses in the Clusters
  
