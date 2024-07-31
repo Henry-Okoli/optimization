@@ -73,7 +73,7 @@ def save_route_data(triptype , route, vehicle, distance_matrix, simulation_folde
 
         # Determine if location is for discharge or restock
     
-        if (triptype == 'Slaughterhouse_Warehouse' and end_location.startswith('S') ) or (triptype == 'Distribution_RetailOutlet' and end_location.startswith('D') ) or (triptype == 'Warehouse_Distribution' and end_location.startswith('W') ) or (triptype == 'PC_Slaughterhouse' and end_location.startswith('M') ):
+        if (triptype == 'Slaughterhouse_Warehouse' and end_location.startswith('S') ) or (triptype == 'Distribution_RetailOutlet' and end_location.startswith('D') ) or (triptype == 'Warehouse_Distribution' and end_location.startswith('W') ) or (triptype == 'PC_Warehouse' and end_location.startswith('M') ):
             # This is a distribution center or warehouse, so we restock
             discharged_restocked = vehicle.Capacity_KG - current_load
             new_load = vehicle.Capacity_KG
