@@ -15,6 +15,8 @@ NUM_ITERATIONS = 30
 ALPHA = 1
 BETA = 5, 
 
+RESUPPLY_THRESHOLD = 0.8  # Resupply when 80% of capacity is used (20% empty)
+
 class Ant:
     def __init__(self, start_location, end_locations, vehicles, distance_matrix, pheromone_matrix, alpha, beta, location_index_mapping, locations_df, distribution_centers):
         self.start_location = start_location
@@ -42,6 +44,8 @@ class Ant:
         self.unserviced_locations = set(end_locations)
         self.start_type = start_location[0]  # 'M', 'W', or 'D'
         self.end_type = end_locations[0][0] if end_locations else None  # 'W', 'D', or 'R'
+        
+        self.resupply_threshold = RESUPPLY_THRESHOLD
 
     def construct_route(self, max_iterations=50):
         iterations = 0
@@ -52,10 +56,14 @@ class Ant:
             if iterations % max_iterations == 0:
                 print(f"Iteration {iterations}: Current location {self.current_location}, Remaining locations: {self.unserviced_locations}")
 
+
+            vehicle_current_load = self.current_load # Allows us to log the current load
+
+            
             next_location = self.select_next_location()
             print(next_location)
             
-            vehicle_current_load = self.current_load # Allows us to log the current load
+            
 
             if next_location is None:
                 print(f"No valid next location found. Breaking loop.")
@@ -84,9 +92,9 @@ class Ant:
                 else:
                     dc_load = self.location_demands[nearest_dc]
                     
-                    self.location_demands[nearest_dc] -= dc_load - self.current_vehicle['Capacity_KG']
+                    self.location_demands[nearest_dc] -= dc_load - (self.current_vehicle['Capacity_KG'] - self.current_load)
                     self.route.append(nearest_dc)
-                    self.current_load = dc_load -self.current_vehicle['Capacity_KG']
+                    self.current_load = self.current_vehicle['Capacity_KG'] - self.current_load  if dc_load >= self.current_vehicle['Capacity_KG'] else dc_load
                     print(f"Insufficient load. Restocked at nearest DC {nearest_dc} and {self.current_load} with {dc_load}")
             
             self.update_costs(self.route[-2], self.route[-1])
